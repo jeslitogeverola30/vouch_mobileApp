@@ -1,7 +1,9 @@
+import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
 
+import '../../../core/data/local/database_helper.dart';
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../routes/app_router.dart';
 
@@ -14,6 +16,7 @@ class StudentHomeScreen extends StatefulWidget {
 
 class _StudentHomeScreenState extends State<StudentHomeScreen> {
   int _selectedNavIndex = 0;
+  String _studentName = 'Student';
 
   // Mock data for events
   final List<Map<String, String>> todayEvents = [
@@ -28,6 +31,34 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
       'description': 'Show your love to Filipino',
     },
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadStudentData();
+    });
+  }
+
+  Future<void> _loadStudentData() async {
+    final authState = ClerkAuth.of(context, listen: false);
+    final email = authState.user?.email;
+    if (email == null || email.isEmpty) {
+      return;
+    }
+
+    final student = await DatabaseHelper.instance.getStudentByEmail(email);
+    if (student == null || !mounted) {
+      return;
+    }
+
+    final fullName = (student['full_name'] as String? ?? '').trim();
+    final firstName = fullName.isEmpty ? 'Student' : fullName.split(' ').first;
+
+    setState(() {
+      _studentName = firstName;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -203,9 +234,9 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             RichText(
-              text: const TextSpan(
+              text: TextSpan(
                 children: [
-                  TextSpan(
+                  const TextSpan(
                     text: 'Hello, ',
                     style: TextStyle(
                       color: Color(0xFF003DA5),
@@ -214,7 +245,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                     ),
                   ),
                   TextSpan(
-                    text: 'Jeslito',
+                    text: _studentName,
                     style: TextStyle(
                       color: Color(0xFFFFC107),
                       fontSize: 28,

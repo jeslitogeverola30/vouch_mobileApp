@@ -1,8 +1,10 @@
 import 'package:clerk_auth/clerk_auth.dart' as clerk;
 import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../core/data/local/database_helper.dart';
 import '../../../routes/app_router.dart';
 
 class SignUpScreen extends StatefulWidget {
@@ -21,8 +23,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   // Form controllers
   late TextEditingController fullNameController;
-  late TextEditingController schoolIDFirstController;
-  late TextEditingController schoolIDSecondController;
+  late TextEditingController schoolIDController;
   late TextEditingController emailController;
   late TextEditingController passwordController;
   late TextEditingController confirmPasswordController;
@@ -36,24 +37,43 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   // Sample data
   final List<String> faculties = [
-    'Faculty 1',
-    'Faculty 2',
-    'Faculty 3',
-    'Faculty 4',
+    'Faculty of Computing, Engineering, and Technology',
+    'Faculty of Agriculture and Life Sciences',
+    'Faculty of Business and Management',
+    'Faculty of Teachers Education',
+    'Faculty of Nursing and Health Sciences',
+    'Faculty of Criminal Justice Education',
   ];
-  final List<String> degrees = [
-    'Bachelor 1',
-    'Bachelor 2',
-    'Bachelor 3',
-    'Bachelor 4',
-  ];
+  final Map<String, List<String>> facultyPrograms = {
+    'Faculty of Computing, Engineering, and Technology': [
+      'Bachelor of Science in Information Technology',
+      'Bachelor of Science in Civil Engineering',
+      'Bachelor of Science in Mathematics',
+      'Bachelor of Science in Industrial Technology Management',
+    ],
+    'Faculty of Agriculture and Life Sciences': [
+      ' Bachelor of Science in Biology',
+      'Bachelor of Science in Agriculture',
+      'Bachelor of Science in Applied Mathematics',
+    ],
+    'Faculty of Business and Management': [
+      'Bachelor of Science in Hospitality Management',
+      'Bachelor of Science in Business Administration',
+    ],
+    'Faculty of Teachers Education': [],
+    'Faculty of Nursing and Health Sciences': [
+      'Bachelor of Science in Nursing',
+    ],
+    'Faculty of Criminal Justice Education': [
+      'Bachelor of Science in Criminology',
+    ],
+  };
 
   @override
   void initState() {
     super.initState();
     fullNameController = TextEditingController();
-    schoolIDFirstController = TextEditingController();
-    schoolIDSecondController = TextEditingController();
+    schoolIDController = TextEditingController();
     emailController = TextEditingController();
     passwordController = TextEditingController();
     confirmPasswordController = TextEditingController();
@@ -62,8 +82,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   void dispose() {
     fullNameController.dispose();
-    schoolIDFirstController.dispose();
-    schoolIDSecondController.dispose();
+    schoolIDController.dispose();
     emailController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
@@ -73,6 +92,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme);
+    final availableDegrees = selectedFaculty == null
+        ? const <String>[]
+        : (facultyPrograms[selectedFaculty] ?? const <String>[]);
 
     return Theme(
       data: Theme.of(context).copyWith(textTheme: textTheme),
@@ -165,18 +187,27 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   value: selectedFaculty,
                                   items: faculties,
                                   onChanged: (value) {
-                                    setState(() => selectedFaculty = value);
+                                    setState(() {
+                                      selectedFaculty = value;
+                                      selectedDegree = null;
+                                    });
                                   },
                                 ),
                                 const SizedBox(height: 16),
-                                _buildLabel("Bachelor's Degree"),
+                                _buildLabel("Program"),
                                 _buildDropdown(
-                                  hint: 'Select Degree',
+                                  hint: selectedFaculty == null
+                                      ? 'Select Faculty first'
+                                      : 'Select Degree',
                                   value: selectedDegree,
-                                  items: degrees,
-                                  onChanged: (value) {
-                                    setState(() => selectedDegree = value);
-                                  },
+                                  items: availableDegrees,
+                                  onChanged: availableDegrees.isEmpty
+                                      ? null
+                                      : (value) {
+                                          setState(
+                                            () => selectedDegree = value,
+                                          );
+                                        },
                                 ),
                                 const SizedBox(height: 16),
                                 _buildLabel('Full Name'),
@@ -187,25 +218,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 ),
                                 const SizedBox(height: 16),
                                 _buildLabel('School ID No.'),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: _buildTextField(
-                                        controller: schoolIDFirstController,
-                                        hint: 'XXXX',
-                                        maxLength: 4,
-                                        keyboardType: TextInputType.number,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: _buildTextField(
-                                        controller: schoolIDSecondController,
-                                        hint: 'XXXX',
-                                        maxLength: 4,
-                                        keyboardType: TextInputType.number,
-                                      ),
-                                    ),
+                                _buildTextField(
+                                  controller: schoolIDController,
+                                  hint: 'XXXX-XXXX',
+                                  maxLength: 9,
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    _SchoolIdFormatter(),
                                   ],
                                 ),
                                 const SizedBox(height: 16),
@@ -290,13 +310,36 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   Future<void> _handleSignUp() async {
     final fullName = fullNameController.text.trim();
+    final schoolId = schoolIDController.text.trim();
     final email = emailController.text.trim();
     final password = passwordController.text;
     final confirmPassword = confirmPasswordController.text;
+    final faculty = selectedFaculty;
+    final program = selectedDegree;
 
-    if (fullName.isEmpty || email.isEmpty || password.isEmpty) {
+    if (fullName.isEmpty ||
+        schoolId.isEmpty ||
+        email.isEmpty ||
+        password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all required fields.')),
+      );
+      return;
+    }
+
+    if (faculty == null || program == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select your faculty and program.'),
+        ),
+      );
+      return;
+    }
+
+    final isSchoolIdValid = RegExp(r'^\d{4}-\d{4}$').hasMatch(schoolId);
+    if (!isSchoolIdValid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('School ID must be in XXXX-XXXX format.')),
       );
       return;
     }
@@ -334,6 +377,27 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     if (authState.signUp == null) {
       setState(() => isSubmitting = false);
+      return;
+    }
+
+    try {
+      await DatabaseHelper.instance.insertStudent(
+        studentId: schoolId,
+        fullName: fullName,
+        faculty: faculty,
+        program: program,
+        email: email,
+        rawPassword: password,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() => isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to save local student record.')),
+      );
       return;
     }
 
@@ -402,7 +466,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     required String hint,
     required String? value,
     required List<String> items,
-    required Function(String?) onChanged,
+    required ValueChanged<String?>? onChanged,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -457,11 +521,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
     IconData? prefixIcon,
     TextInputType keyboardType = TextInputType.text,
     int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
       maxLength: maxLength,
+      inputFormatters: inputFormatters,
       decoration: _buildInputDecoration(
         hintText: hint,
         icon: prefixIcon,
@@ -580,6 +646,26 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
               ),
       ),
+    );
+  }
+}
+
+class _SchoolIdFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final trimmed = digits.length > 8 ? digits.substring(0, 8) : digits;
+
+    final formatted = trimmed.length <= 4
+        ? trimmed
+        : '${trimmed.substring(0, 4)}-${trimmed.substring(4)}';
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

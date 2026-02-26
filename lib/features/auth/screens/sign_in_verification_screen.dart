@@ -5,17 +5,17 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../routes/app_router.dart';
 
-class EmailVerificationScreen extends StatefulWidget {
-  const EmailVerificationScreen({super.key, required this.email});
+class SignInVerificationScreen extends StatefulWidget {
+  const SignInVerificationScreen({super.key, required this.email});
 
   final String email;
 
   @override
-  State<EmailVerificationScreen> createState() =>
-      _EmailVerificationScreenState();
+  State<SignInVerificationScreen> createState() =>
+      _SignInVerificationScreenState();
 }
 
-class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
+class _SignInVerificationScreenState extends State<SignInVerificationScreen> {
   late final TextEditingController _codeController;
   bool _isSubmitting = false;
   bool _isResending = false;
@@ -32,7 +32,10 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       final authState = ClerkAuth.of(context, listen: false);
       if (authState.user != null) {
         _goToHome();
+        return;
       }
+
+      _sendSecondFactorCode();
     });
   }
 
@@ -57,7 +60,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
 
     await authState.safelyCall(
       context,
-      () => authState.attemptSignUp(
+      () => authState.attemptSignIn(
         strategy: clerk.Strategy.emailCode,
         code: code,
       ),
@@ -70,7 +73,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     }
 
     if (authState.user != null ||
-        authState.signUp?.status == clerk.Status.complete) {
+        authState.signIn?.status == clerk.Status.complete) {
       _goToHome();
       return;
     }
@@ -88,14 +91,14 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     ).pushNamedAndRemoveUntil(AppRouter.studentHome, (route) => false);
   }
 
-  Future<void> _resendCode() async {
+  Future<void> _sendSecondFactorCode() async {
     setState(() => _isResending = true);
 
     final authState = ClerkAuth.of(context, listen: false);
 
     await authState.safelyCall(
       context,
-      () => authState.attemptSignUp(strategy: clerk.Strategy.emailCode),
+      () => authState.attemptSignIn(strategy: clerk.Strategy.emailCode),
     );
 
     if (!mounted) {
@@ -248,7 +251,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                                       ),
                                       const SizedBox(height: 16),
                                       Text(
-                                        'Verify your email',
+                                        'Verify your login',
                                         style: GoogleFonts.poppins(
                                           fontSize: 20,
                                           fontWeight: FontWeight.w700,
@@ -374,7 +377,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                                                   ),
                                                 )
                                               : Text(
-                                                  'Verify Email',
+                                                  'Verify Login',
                                                   style: GoogleFonts.poppins(
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.w700,
@@ -386,7 +389,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                                       TextButton(
                                         onPressed: _isResending
                                             ? null
-                                            : _resendCode,
+                                            : _sendSecondFactorCode,
                                         style: TextButton.styleFrom(
                                           foregroundColor: const Color(
                                             0xFF003DA5,

@@ -1,3 +1,4 @@
+import 'package:clerk_auth/clerk_auth.dart' as clerk;
 import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:flutter/material.dart';
 
@@ -11,12 +12,17 @@ void main() {
 class VouchMobileApp extends StatelessWidget {
   const VouchMobileApp({super.key});
 
-  static const String publishableKey = 'pk_test_dGlkeS1ndWxsLTQxLmNsZXJrLmFjY291bnRzLmRldiQ';
+  static const String publishableKey =
+      'pk_test_a25vd24tZHJhZ29uLTkyLmNsZXJrLmFjY291bnRzLmRldiQ';
 
   @override
   Widget build(BuildContext context) {
     return ClerkAuth(
-      config: ClerkAuthConfig(publishableKey: publishableKey),
+      config: ClerkAuthConfig(
+        publishableKey: publishableKey,
+        persistor: clerk.Persistor.none,
+        flags: const ClerkSdkFlags(clearCookiesOnSignOut: true),
+      ),
       child: MaterialApp(
         title: 'Vouch Mobile App',
         debugShowCheckedModeBanner: false,
