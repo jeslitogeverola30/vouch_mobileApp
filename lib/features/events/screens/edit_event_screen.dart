@@ -5,8 +5,6 @@ class EditEventScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: Text('Edit Event Screen')),
-    );
+    return const Scaffold(body: Center(child: Text('Edit Event Screen')));
   }
 }

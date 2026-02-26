@@ -9,10 +9,7 @@ class EventCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: ListTile(
-        title: Text(title),
-        onTap: onTap,
-      ),
+      child: ListTile(title: Text(title), onTap: onTap),
     );
   }
 }

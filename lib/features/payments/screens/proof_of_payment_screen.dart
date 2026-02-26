@@ -5,8 +5,6 @@ class ProofOfPaymentScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: Text('Proof of Payment Screen')),
-    );
+    return const Scaffold(body: Center(child: Text('Proof of Payment Screen')));
   }
 }
