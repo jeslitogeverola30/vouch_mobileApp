@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 
 class ProfileOptionTile extends StatelessWidget {
-  const ProfileOptionTile({
-    super.key,
-    required this.title,
-    this.onTap,
-  });
+  const ProfileOptionTile({super.key, required this.title, this.onTap});
 
   final String title;
   final VoidCallback? onTap;

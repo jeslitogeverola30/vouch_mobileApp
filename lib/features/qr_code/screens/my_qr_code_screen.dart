@@ -5,8 +5,6 @@ class MyQrCodeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: Text('My QR Code Screen')),
-    );
+    return const Scaffold(body: Center(child: Text('My QR Code Screen')));
   }
 }
