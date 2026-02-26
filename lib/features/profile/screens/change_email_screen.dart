@@ -5,8 +5,6 @@ class ChangeEmailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: Text('Change Email Screen')),
-    );
+    return const Scaffold(body: Center(child: Text('Change Email Screen')));
   }
 }

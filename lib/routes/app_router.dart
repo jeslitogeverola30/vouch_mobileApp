@@ -23,9 +23,8 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const AdminHomeScreen());
       default:
         return MaterialPageRoute(
-          builder: (_) => const Scaffold(
-            body: Center(child: Text('Route not found')),
-          ),
+          builder: (_) =>
+              const Scaffold(body: Center(child: Text('Route not found'))),
         );
     }
   }
