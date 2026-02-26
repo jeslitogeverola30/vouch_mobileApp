@@ -1,9 +1,13 @@
+import 'package:clerk_auth/clerk_auth.dart' as clerk;
+import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:flutter/material.dart';
 
-import 'login_screen.dart';
+import '../../../routes/app_router.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
-  const EmailVerificationScreen({super.key});
+  const EmailVerificationScreen({super.key, required this.email});
+
+  final String email;
 
   @override
   State<EmailVerificationScreen> createState() =>
@@ -11,210 +15,177 @@ class EmailVerificationScreen extends StatefulWidget {
 }
 
 class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
-  late final List<TextEditingController> _controllers;
-  bool _isVerified = false;
-  String _resendMessage = '';
+  late final TextEditingController _codeController;
+  bool _isSubmitting = false;
+  bool _isResending = false;
 
   @override
   void initState() {
     super.initState();
-    _controllers = List.generate(6, (_) => TextEditingController());
+    _codeController = TextEditingController();
   }
 
   @override
   void dispose() {
-    for (final controller in _controllers) {
-      controller.dispose();
-    }
+    _codeController.dispose();
     super.dispose();
   }
 
-  bool get _isCodeComplete =>
-      _controllers.every((controller) => controller.text.trim().isNotEmpty);
-
-  void _verifyCode() {
-    if (!_isCodeComplete) {
+  Future<void> _verifyCode() async {
+    final code = _codeController.text.trim();
+    if (code.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter the verification code.')),
+      );
       return;
     }
-    setState(() {
-      _isVerified = true;
-    });
+
+    setState(() => _isSubmitting = true);
+
+    final authState = ClerkAuth.of(context, listen: false);
+
+    await authState.safelyCall(
+      context,
+      () => authState.attemptSignUp(
+        strategy: clerk.Strategy.emailCode,
+        code: code,
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (authState.signUp?.status == clerk.Status.complete) {
+      await authState.refreshClient();
+      if (authState.user != null) {
+        await authState.signOut();
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Email verified. Please log in.')),
+      );
+
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil(AppRouter.login, (route) => false);
+      return;
+    }
+
+    setState(() => _isSubmitting = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Verification not complete yet.')),
+    );
   }
 
-  void _resendCode() {
-    setState(() {
-      _resendMessage = 'Verification code sent! Please check your email.';
-    });
+  Future<void> _resendCode() async {
+    setState(() => _isResending = true);
+
+    final authState = ClerkAuth.of(context, listen: false);
+
+    await authState.safelyCall(
+      context,
+      () => authState.attemptSignUp(strategy: clerk.Strategy.emailCode),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _isResending = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Verification code sent.')),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isVerified) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFF8FAFC),
-        body: Stack(
-          children: [
-            const Positioned(
-              top: -80,
-              right: -60,
-              child: _BgCircle(size: 220, color: Color(0xFFFACC15)),
-            ),
-            const Positioned(
-              bottom: -90,
-              left: -80,
-              child: _BgCircle(size: 240, color: Color(0xFF1D4ED8)),
-            ),
-            Center(
-              child: Card(
-                margin: const EdgeInsets.all(20),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 80,
-                        height: 80,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Color(0xFF22C55E),
-                        ),
-                        child: const Icon(Icons.check, color: Colors.white),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Code Verified! 🎉',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Your account has been successfully verified. You can now sign in to your account.',
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      FilledButton(
-                        onPressed: () {
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(
-                              builder: (_) => const LoginScreen(),
-                            ),
-                            (_) => false,
-                          );
-                        },
-                        child: const Text('Sign In Now'),
-                      ),
-                    ],
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('Verify Email'),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF003DA5),
+        elevation: 0,
+      ),
+      body: ClerkErrorListener(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Enter the code sent to ${widget.email}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF003DA5),
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Card(
-              margin: const EdgeInsets.all(20),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Email Verification',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
+                const SizedBox(height: 24),
+                TextField(
+                  controller: _codeController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    hintText: '6-digit code',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF003DA5),
+                        width: 2,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'We\'ve sent a verification code to your email address. Please check your inbox and enter the code below.',
-                      textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isSubmitting ? null : _verifyCode,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFC107),
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: List.generate(
-                        6,
-                        (index) => SizedBox(
-                          width: 44,
-                          child: TextField(
-                            controller: _controllers[index],
-                            textAlign: TextAlign.center,
-                            maxLength: 1,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(counterText: ''),
-                            onChanged: (_) => setState(() {}),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: _isCodeComplete ? _verifyCode : null,
-                        child: const Text('Verify Code'),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text('Didn\'t receive the code? '),
-                        GestureDetector(
-                          onTap: _resendCode,
-                          child: const Text(
-                            'Resend Code',
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text(
+                            'Verify Email',
                             style: TextStyle(
-                              color: Color(0xFF1D4ED8),
-                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF003DA5),
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    if (_resendMessage.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        _resendMessage,
-                        style: const TextStyle(color: Color(0xFF10B981)),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: _isResending ? null : _resendCode,
+                  child: _isResending
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Resend code'),
+                ),
+              ],
             ),
           ),
         ),
       ),
-    );
-  }
-}
-
-class _BgCircle extends StatelessWidget {
-  const _BgCircle({required this.size, required this.color});
-
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
 }

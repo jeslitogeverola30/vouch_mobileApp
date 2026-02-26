@@ -1,4 +1,8 @@
+import 'package:clerk_auth/clerk_auth.dart' as clerk;
+import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:flutter/material.dart';
+
+import '../../../routes/app_router.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -28,6 +32,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   String? selectedDegree;
   bool showPassword = false;
   bool showConfirmPassword = false;
+  bool isSubmitting = false;
 
   // Sample data
   final List<String> faculties = [
@@ -71,8 +76,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     return Scaffold(
       backgroundColor: white,
-      body: Stack(
-        children: [
+      body: ClerkErrorListener(
+        child: Stack(
+          children: [
           // Background decorative shapes
           _buildBackgroundShapes(context),
 
@@ -230,8 +236,75 @@ class _SignUpScreenState extends State<SignUpScreen> {
               ),
             ),
           ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+
+  Future<void> _handleSignUp() async {
+    final fullName = fullNameController.text.trim();
+    final email = emailController.text.trim();
+    final password = passwordController.text;
+    final confirmPassword = confirmPasswordController.text;
+
+    if (fullName.isEmpty || email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all required fields.')),
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Passwords do not match.')),
+      );
+      return;
+    }
+
+    final names = fullName.split(' ').where((part) => part.isNotEmpty).toList();
+    final firstName = names.isNotEmpty ? names.first : null;
+    final lastName = names.length > 1 ? names.sublist(1).join(' ') : null;
+
+    setState(() => isSubmitting = true);
+
+    final authState = ClerkAuth.of(context, listen: false);
+
+    await authState.safelyCall(
+      context,
+      () => authState.attemptSignUp(
+        strategy: clerk.Strategy.password,
+        firstName: firstName,
+        lastName: lastName,
+        emailAddress: email,
+        password: password,
+        passwordConfirmation: confirmPassword,
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (authState.signUp == null) {
+      setState(() => isSubmitting = false);
+      return;
+    }
+
+    await authState.safelyCall(
+      context,
+      () => authState.attemptSignUp(strategy: clerk.Strategy.emailCode),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => isSubmitting = false);
+
+    Navigator.of(context).pushNamed(
+      AppRouter.emailVerification,
+      arguments: email,
     );
   }
 
@@ -246,7 +319,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             width: 400,
             height: 400,
             decoration: BoxDecoration(
-              color: royalBlue.withOpacity(0.08),
+              color: royalBlue.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(200),
             ),
           ),
@@ -259,7 +332,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             width: 350,
             height: 350,
             decoration: BoxDecoration(
-              color: gold.withOpacity(0.08),
+              color: gold.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(175),
             ),
           ),
@@ -272,7 +345,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             width: 300,
             height: 300,
             decoration: BoxDecoration(
-              color: royalBlue.withOpacity(0.05),
+              color: royalBlue.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(150),
             ),
           ),
@@ -437,12 +510,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       width: double.infinity,
       height: 56,
       child: ElevatedButton(
-        onPressed: () {
-          // Handle sign up
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Sign Up button pressed')),
-          );
-        },
+        onPressed: isSubmitting ? null : _handleSignUp,
         style: ElevatedButton.styleFrom(
           backgroundColor: gold,
           shape: RoundedRectangleBorder(
@@ -450,14 +518,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
           ),
           elevation: 0,
         ),
-        child: Text(
-          'Sign Up',
-          style: TextStyle(
-            color: royalBlue,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        child: isSubmitting
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF003DA5)),
+                ),
+              )
+            : Text(
+                'Sign Up',
+                style: TextStyle(
+                  color: royalBlue,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
       ),
     );
   }
