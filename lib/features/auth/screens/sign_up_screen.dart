@@ -1,6 +1,7 @@
 import 'package:clerk_auth/clerk_auth.dart' as clerk;
 import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../../routes/app_router.dart';
 
@@ -16,7 +17,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
   static const Color royalBlue = Color(0xFF003DA5);
   static const Color gold = Color(0xFFFFC107);
   static const Color white = Color(0xFFFFFFFF);
-  static const Color borderGray = Color(0xFFE0E0E0);
   static const Color darkText = Color(0xFF1A1A1A);
 
   // Form controllers
@@ -72,171 +72,217 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final textTheme = GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme);
 
-    return Scaffold(
-      backgroundColor: white,
-      body: ClerkErrorListener(
-        child: Stack(
-          children: [
-          // Background decorative shapes
-          _buildBackgroundShapes(context),
-
-          // Main content
-          SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 24.0 : 48.0,
-                vertical: 40.0,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(height: MediaQuery.of(context).padding.top + 20),
-
-                  // Header
-                  Center(
-                    child: Text(
-                      'Sign Up',
-                      style: Theme.of(context).textTheme.headlineLarge
-                          ?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: darkText,
-                            fontSize: isMobile ? 28 : 32,
-                          ),
-                    ),
-                  ),
-                  SizedBox(height: isMobile ? 32 : 48),
-
-                  // Faculty Dropdown
-                  _buildLabel('Faculty'),
-                  _buildDropdown(
-                    hint: 'Select Faculty',
-                    value: selectedFaculty,
-                    items: faculties,
-                    onChanged: (value) {
-                      setState(() => selectedFaculty = value);
-                    },
-                  ),
-                  SizedBox(height: isMobile ? 20 : 28),
-
-                  // Degree Dropdown
-                  _buildLabel("Bachelor's Degree"),
-                  _buildDropdown(
-                    hint: 'Select Degree',
-                    value: selectedDegree,
-                    items: degrees,
-                    onChanged: (value) {
-                      setState(() => selectedDegree = value);
-                    },
-                  ),
-                  SizedBox(height: isMobile ? 20 : 28),
-
-                  // Full Name
-                  _buildLabel('Full Name'),
-                  _buildTextField(
-                    controller: fullNameController,
-                    hint: 'Enter Full Name',
-                    prefixIcon: Icons.person_outline,
-                  ),
-                  SizedBox(height: isMobile ? 20 : 28),
-
-                  // School ID fields
-                  _buildLabel('School ID No.'),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildTextField(
-                          controller: schoolIDFirstController,
-                          hint: 'XXXX',
-                          maxLength: 4,
-                        ),
+    return Theme(
+      data: Theme.of(context).copyWith(textTheme: textTheme),
+      child: Scaffold(
+        backgroundColor: white,
+        body: ClerkErrorListener(
+          child: SafeArea(
+            child: Stack(
+              children: [
+                _buildBackgroundShapes(context),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 24,
                       ),
-                      SizedBox(width: 16),
-                      Expanded(
-                        child: _buildTextField(
-                          controller: schoolIDSecondController,
-                          hint: 'XXXX',
-                          maxLength: 4,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: isMobile ? 20 : 28),
-
-                  // Email
-                  _buildLabel('Email'),
-                  _buildTextField(
-                    controller: emailController,
-                    hint: 'Enter Email',
-                    prefixIcon: Icons.mail_outline,
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  SizedBox(height: isMobile ? 20 : 28),
-
-                  // Password
-                  _buildLabel('Password'),
-                  _buildPasswordField(
-                    controller: passwordController,
-                    hint: 'Enter Password',
-                    isVisible: showPassword,
-                    onToggle: () {
-                      setState(() => showPassword = !showPassword);
-                    },
-                  ),
-                  SizedBox(height: isMobile ? 20 : 28),
-
-                  // Confirm Password
-                  _buildLabel('Confirm Password'),
-                  _buildPasswordField(
-                    controller: confirmPasswordController,
-                    hint: 'Re-enter Password',
-                    isVisible: showConfirmPassword,
-                    onToggle: () {
-                      setState(
-                        () => showConfirmPassword = !showConfirmPassword,
-                      );
-                    },
-                  ),
-                  SizedBox(height: isMobile ? 28 : 40),
-
-                  // Sign Up Button
-                  _buildSignUpButton(context),
-                  SizedBox(height: isMobile ? 20 : 24),
-
-                  // Sign In Link
-                  Center(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Already have an account? ',
-                          style: Theme.of(
-                            context,
-                          ).textTheme.bodyMedium?.copyWith(color: darkText),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.of(context).pop();
-                          },
-                          child: Text(
-                            'Sign In',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: royalBlue,
-                                  fontWeight: FontWeight.w600,
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 460),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: royalBlue.withOpacity(0.1),
+                                width: 1.2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 6),
                                 ),
+                              ],
+                            ),
+                            padding: const EdgeInsets.fromLTRB(24, 24, 24, 22),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Center(
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Image.asset(
+                                        'assets/logos/vouch_logo.png',
+                                        width: 44,
+                                        height: 44,
+                                        fit: BoxFit.contain,
+                                      ),
+                                      const SizedBox(width: 2),
+                                      RichText(
+                                        text: TextSpan(
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 30,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                          children: const [
+                                            TextSpan(
+                                              text: 'ou',
+                                              style: TextStyle(
+                                                color: royalBlue,
+                                              ),
+                                            ),
+                                            TextSpan(
+                                              text: 'ch',
+                                              style: TextStyle(color: gold),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Center(
+                                  child: Text(
+                                    'Create your account',
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.black54,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                                _buildLabel('Faculty'),
+                                _buildDropdown(
+                                  hint: 'Select Faculty',
+                                  value: selectedFaculty,
+                                  items: faculties,
+                                  onChanged: (value) {
+                                    setState(() => selectedFaculty = value);
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                                _buildLabel("Bachelor's Degree"),
+                                _buildDropdown(
+                                  hint: 'Select Degree',
+                                  value: selectedDegree,
+                                  items: degrees,
+                                  onChanged: (value) {
+                                    setState(() => selectedDegree = value);
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                                _buildLabel('Full Name'),
+                                _buildTextField(
+                                  controller: fullNameController,
+                                  hint: 'Enter Full Name',
+                                  prefixIcon: Icons.person_outline,
+                                ),
+                                const SizedBox(height: 16),
+                                _buildLabel('School ID No.'),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildTextField(
+                                        controller: schoolIDFirstController,
+                                        hint: 'XXXX',
+                                        maxLength: 4,
+                                        keyboardType: TextInputType.number,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: _buildTextField(
+                                        controller: schoolIDSecondController,
+                                        hint: 'XXXX',
+                                        maxLength: 4,
+                                        keyboardType: TextInputType.number,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                _buildLabel('Email'),
+                                _buildTextField(
+                                  controller: emailController,
+                                  hint: 'Enter Email',
+                                  prefixIcon: Icons.mail_outline,
+                                  keyboardType: TextInputType.emailAddress,
+                                ),
+                                const SizedBox(height: 16),
+                                _buildLabel('Password'),
+                                _buildPasswordField(
+                                  controller: passwordController,
+                                  hint: 'Enter Password',
+                                  isVisible: showPassword,
+                                  onToggle: () {
+                                    setState(
+                                      () => showPassword = !showPassword,
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                                _buildLabel('Confirm Password'),
+                                _buildPasswordField(
+                                  controller: confirmPasswordController,
+                                  hint: 'Re-enter Password',
+                                  isVisible: showConfirmPassword,
+                                  onToggle: () {
+                                    setState(() {
+                                      showConfirmPassword =
+                                          !showConfirmPassword;
+                                    });
+                                  },
+                                ),
+                                const SizedBox(height: 22),
+                                _buildSignUpButton(context),
+                                const SizedBox(height: 10),
+                                Center(
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'Already have an account? ',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                          color: darkText,
+                                        ),
+                                      ),
+                                      GestureDetector(
+                                        onTap: () {
+                                          Navigator.of(context).pop();
+                                        },
+                                        child: Text(
+                                          'Sign In',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: royalBlue,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 40),
-                ],
-              ),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
           ),
-          ],
         ),
       ),
     );
@@ -256,9 +302,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
 
     if (password != confirmPassword) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Passwords do not match.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Passwords do not match.')));
       return;
     }
 
@@ -302,51 +348,35 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     setState(() => isSubmitting = false);
 
-    Navigator.of(context).pushNamed(
-      AppRouter.emailVerification,
-      arguments: email,
-    );
+    Navigator.of(
+      context,
+    ).pushNamed(AppRouter.emailVerification, arguments: email);
   }
 
   Widget _buildBackgroundShapes(BuildContext context) {
     return Stack(
       children: [
-        // Top blue shape
         Positioned(
-          top: -100,
+          top: 70,
           right: -50,
           child: Container(
-            width: 400,
-            height: 400,
+            width: 210,
+            height: 210,
             decoration: BoxDecoration(
-              color: royalBlue.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(200),
+              color: gold.withOpacity(0.16),
+              borderRadius: BorderRadius.circular(120),
             ),
           ),
         ),
-        // Bottom gold shape
         Positioned(
-          bottom: -80,
-          left: -50,
+          bottom: 170,
+          left: -30,
           child: Container(
-            width: 350,
-            height: 350,
+            width: 160,
+            height: 160,
             decoration: BoxDecoration(
-              color: gold.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(175),
-            ),
-          ),
-        ),
-        // Right side decorative shape
-        Positioned(
-          top: 200,
-          right: -80,
-          child: Container(
-            width: 300,
-            height: 300,
-            decoration: BoxDecoration(
-              color: royalBlue.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(150),
+              color: royalBlue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(90),
             ),
           ),
         ),
@@ -356,13 +386,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   Widget _buildLabel(String label) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Text(
         label,
-        style: TextStyle(
+        style: GoogleFonts.poppins(
           color: darkText,
           fontWeight: FontWeight.w600,
-          fontSize: 14,
+          fontSize: 13,
         ),
       ),
     );
@@ -376,26 +406,35 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: borderGray, width: 1.5),
-        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: royalBlue.withOpacity(0.15), width: 1.5),
+        borderRadius: BorderRadius.circular(14),
         color: white,
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           hint: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Text(
               hint,
-              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+              style: GoogleFonts.poppins(
+                color: Colors.grey.shade500,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
           value: value,
+          style: GoogleFonts.poppins(
+            color: darkText,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
           items: items
               .map(
                 (item) => DropdownMenuItem(
                   value: item,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: Text(item),
                   ),
                 ),
@@ -404,8 +443,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
           onChanged: onChanged,
           isExpanded: true,
           icon: Padding(
-            padding: const EdgeInsets.only(right: 12.0),
-            child: Icon(Icons.expand_more, color: royalBlue),
+            padding: const EdgeInsets.only(right: 10),
+            child: Icon(Icons.expand_more_rounded, color: royalBlue),
           ),
         ),
       ),
@@ -419,36 +458,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
     TextInputType keyboardType = TextInputType.text,
     int? maxLength,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: borderGray, width: 1.5),
-        borderRadius: BorderRadius.circular(12),
-        color: white,
-      ),
-      child: TextField(
-        controller: controller,
-        keyboardType: keyboardType,
-        maxLength: maxLength,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(color: Colors.grey[600], fontSize: 14),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 16,
-          ),
-          prefixIcon: prefixIcon != null
-              ? Padding(
-                  padding: const EdgeInsets.only(left: 12, right: 8),
-                  child: Icon(prefixIcon, color: gold, size: 20),
-                )
-              : null,
-          prefixIconConstraints: prefixIcon != null
-              ? const BoxConstraints(minWidth: 0, minHeight: 0)
-              : null,
-          counterText: '',
-        ),
-        style: const TextStyle(color: darkText, fontSize: 14),
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      maxLength: maxLength,
+      decoration: _buildInputDecoration(
+        hintText: hint,
+        icon: prefixIcon,
+      ).copyWith(counterText: ''),
+      style: GoogleFonts.poppins(
+        color: darkText,
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
       ),
     );
   }
@@ -459,49 +480,70 @@ class _SignUpScreenState extends State<SignUpScreen> {
     required bool isVisible,
     required VoidCallback onToggle,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: borderGray, width: 1.5),
-        borderRadius: BorderRadius.circular(12),
-        color: white,
-      ),
-      child: TextField(
-        controller: controller,
-        obscureText: !isVisible,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(color: Colors.grey[600], fontSize: 14),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 16,
-          ),
-          prefixIcon: Padding(
-            padding: const EdgeInsets.only(left: 12, right: 8),
-            child: Icon(Icons.lock_outline, color: gold, size: 20),
-          ),
-          prefixIconConstraints: const BoxConstraints(
-            minWidth: 0,
-            minHeight: 0,
-          ),
-          suffixIcon: GestureDetector(
-            onTap: onToggle,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Icon(
+    return TextField(
+      controller: controller,
+      obscureText: !isVisible,
+      decoration:
+          _buildInputDecoration(
+            hintText: hint,
+            icon: Icons.lock_outline,
+          ).copyWith(
+            suffixIcon: IconButton(
+              onPressed: onToggle,
+              icon: Icon(
                 isVisible ? Icons.visibility : Icons.visibility_off,
                 color: royalBlue,
                 size: 20,
               ),
             ),
           ),
-          suffixIconConstraints: const BoxConstraints(
-            minWidth: 0,
-            minHeight: 0,
-          ),
-        ),
-        style: const TextStyle(color: darkText, fontSize: 14),
+      style: GoogleFonts.poppins(
+        color: darkText,
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
       ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration({
+    required String hintText,
+    IconData? icon,
+  }) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: royalBlue.withOpacity(0.15), width: 1.5),
+    );
+
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: GoogleFonts.poppins(
+        color: Colors.grey.shade500,
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+      ),
+      border: border,
+      enabledBorder: border,
+      focusedBorder: border.copyWith(
+        borderSide: const BorderSide(color: royalBlue, width: 2),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      prefixIcon: icon == null
+          ? null
+          : Padding(
+              padding: const EdgeInsets.only(left: 10, right: 8),
+              child: Center(
+                widthFactor: 1,
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: gold.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: royalBlue, size: 18),
+                ),
+              ),
+            ),
     );
   }
 
@@ -513,8 +555,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
         onPressed: isSubmitting ? null : _handleSignUp,
         style: ElevatedButton.styleFrom(
           backgroundColor: gold,
+          foregroundColor: royalBlue,
+          disabledBackgroundColor: gold.withOpacity(0.6),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
           ),
           elevation: 0,
         ),
@@ -529,10 +573,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
               )
             : Text(
                 'Sign Up',
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   color: royalBlue,
                   fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
       ),
