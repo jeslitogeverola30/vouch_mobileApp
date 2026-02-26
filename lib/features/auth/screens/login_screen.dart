@@ -88,7 +88,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(24),
                                 border: Border.all(
-                                  color: const Color(0xFF003DA5).withOpacity(0.1),
+                                  color: const Color(
+                                    0xFF003DA5,
+                                  ).withOpacity(0.1),
                                 ),
                                 boxShadow: [
                                   BoxShadow(
@@ -99,12 +101,18 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ],
                               ),
                               child: Padding(
-                                padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+                                padding: const EdgeInsets.fromLTRB(
+                                  24,
+                                  28,
+                                  24,
+                                  24,
+                                ),
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Image.asset(
                                           'assets/logos/vouch_logo.png',
@@ -155,16 +163,24 @@ class _LoginScreenState extends State<LoginScreen> {
                                       width: double.infinity,
                                       height: 52,
                                       child: ElevatedButton(
-                                        onPressed:
-                                            _isSubmitting ? null : _handleLogin,
+                                        onPressed: _isSubmitting
+                                            ? null
+                                            : _handleLogin,
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFFFFC107),
-                                          foregroundColor: const Color(0xFF003DA5),
-                                          disabledBackgroundColor:
-                                              const Color(0xFFFFC107).withOpacity(0.6),
+                                          backgroundColor: const Color(
+                                            0xFFFFC107,
+                                          ),
+                                          foregroundColor: const Color(
+                                            0xFF003DA5,
+                                          ),
+                                          disabledBackgroundColor: const Color(
+                                            0xFFFFC107,
+                                          ).withOpacity(0.6),
                                           elevation: 0,
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(14),
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
                                           ),
                                         ),
                                         child: _isSubmitting
@@ -176,9 +192,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                                   valueColor:
                                                       AlwaysStoppedAnimation<
                                                         Color
-                                                      >(
-                                                        Color(0xFF003DA5),
-                                                      ),
+                                                      >(Color(0xFF003DA5)),
                                                 ),
                                               )
                                             : Text(
@@ -194,7 +208,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                     TextButton(
                                       onPressed: () {},
                                       style: TextButton.styleFrom(
-                                        foregroundColor: const Color(0xFF003DA5),
+                                        foregroundColor: const Color(
+                                          0xFF003DA5,
+                                        ),
                                       ),
                                       child: Text(
                                         'Forgot your password?',
@@ -205,7 +221,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ),
                                     ),
                                     Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Text(
                                           "Don't have an account? ",
@@ -268,6 +285,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final authState = ClerkAuth.of(context, listen: false);
 
+    if (authState.user != null || authState.signIn != null) {
+      await authState.safelyCall(context, () => authState.signOut());
+    }
+
+    await authState.safelyCall(context, () => authState.refreshClient());
+
     await authState.safelyCall(
       context,
       () => authState.attemptSignIn(
@@ -277,31 +300,37 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
 
+    await authState.safelyCall(context, () => authState.refreshClient());
+
     if (!mounted) {
       return;
     }
 
     setState(() => _isSubmitting = false);
 
-    final isSignedIn = authState.user != null;
-    if (isSignedIn) {
+    if (authState.user != null) {
       Navigator.of(
         context,
       ).pushNamedAndRemoveUntil(AppRouter.studentHome, (route) => false);
       return;
     }
 
-    final needsMoreSteps = authState.signIn?.status != null &&
-        authState.signIn!.status != clerk.Status.complete;
-    if (needsMoreSteps) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Sign-in needs additional verification in Clerk settings.',
-          ),
-        ),
-      );
+    final currentSignIn = authState.signIn;
+    final requiresSecondFactor =
+        currentSignIn?.status == clerk.Status.needsSecondFactor;
+
+    if (requiresSecondFactor) {
+      Navigator.of(
+        context,
+      ).pushNamed(AppRouter.signInVerification, arguments: identifier);
+      return;
     }
+
+    const message = 'Invalid email or password.';
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget _buildEmailField() {
@@ -326,23 +355,26 @@ class _LoginScreenState extends State<LoginScreen> {
     return TextField(
       controller: _passwordController,
       obscureText: _obscurePassword,
-      decoration: _buildInputDecoration(
-        hintText: 'Enter your password',
-        icon: Icons.lock_outline,
-      ).copyWith(
-        suffixIcon: IconButton(
-          onPressed: () {
-            setState(() {
-              _obscurePassword = !_obscurePassword;
-            });
-          },
-          icon: Icon(
-            _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility,
-            color: Colors.grey.shade600,
-            size: 20,
+      decoration:
+          _buildInputDecoration(
+            hintText: 'Enter your password',
+            icon: Icons.lock_outline,
+          ).copyWith(
+            suffixIcon: IconButton(
+              onPressed: () {
+                setState(() {
+                  _obscurePassword = !_obscurePassword;
+                });
+              },
+              icon: Icon(
+                _obscurePassword
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility,
+                color: Colors.grey.shade600,
+                size: 20,
+              ),
+            ),
           ),
-        ),
-      ),
       style: GoogleFonts.poppins(
         fontSize: 13,
         fontWeight: FontWeight.w500,
