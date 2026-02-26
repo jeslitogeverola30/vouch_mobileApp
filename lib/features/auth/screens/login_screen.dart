@@ -1,31 +1,9 @@
+import 'package:clerk_auth/clerk_auth.dart' as clerk;
+import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../home/screens/student_home_screen.dart';
+import '../../../routes/app_router.dart';
 import 'sign_up_screen.dart';
-
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Vouch Login',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-        textTheme: GoogleFonts.poppinsTextTheme(),
-        primaryTextTheme: GoogleFonts.poppinsTextTheme(),
-      ),
-      home: const LoginScreen(),
-      debugShowCheckedModeBanner: false,
-    );
-  }
-}
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -38,6 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   late TextEditingController _emailController;
   late TextEditingController _passwordController;
   bool _obscurePassword = true;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -60,8 +39,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF003DA5), // Royal Blue
-      body: Stack(
-        children: [
+      body: ClerkErrorListener(
+        child: Stack(
+          children: [
           // Diagonal shapes background
           Positioned(
             top: -50,
@@ -70,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
               width: 300,
               height: 300,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
             ),
@@ -107,7 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.15),
+                              color: Colors.black.withValues(alpha: 0.15),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),
@@ -130,7 +110,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   shape: BoxShape.circle,
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
+                                      color: Colors.black.withValues(alpha: 0.1),
                                       blurRadius: 10,
                                     ),
                                   ],
@@ -188,14 +168,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 width: double.infinity,
                                 height: 52,
                                 child: ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.of(context).pushReplacement(
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const StudentHomeScreen(),
-                                      ),
-                                    );
-                                  },
+                                  onPressed: _isSubmitting ? null : _handleLogin,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFFFFC107),
                                     shape: RoundedRectangleBorder(
@@ -203,14 +176,26 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                                     elevation: 0,
                                   ),
-                                  child: const Text(
-                                    'Login',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF003DA5),
-                                    ),
-                                  ),
+                                  child: _isSubmitting
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  Color(0xFF003DA5),
+                                                ),
+                                          ),
+                                        )
+                                      : const Text(
+                                          'Login',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF003DA5),
+                                          ),
+                                        ),
                                 ),
                               ),
                               const SizedBox(height: 20),
@@ -272,9 +257,61 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _handleLogin() async {
+    final identifier = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (identifier.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your email and password.')),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    final authState = ClerkAuth.of(context, listen: false);
+
+    await authState.safelyCall(
+      context,
+      () => authState.attemptSignIn(
+        strategy: clerk.Strategy.password,
+        identifier: identifier,
+        password: password,
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _isSubmitting = false);
+
+    final isSignedIn = authState.user != null;
+    if (isSignedIn) {
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil(AppRouter.studentHome, (route) => false);
+      return;
+    }
+
+    final needsMoreSteps = authState.signIn?.status != null &&
+        authState.signIn!.status != clerk.Status.complete;
+    if (needsMoreSteps) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Sign-in needs additional verification in Clerk settings.',
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildEmailField() {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../features/auth/screens/email_verification_screen.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/sign_up_screen.dart';
 import '../features/home/screens/admin_home_screen.dart';
@@ -8,6 +9,7 @@ import '../features/home/screens/student_home_screen.dart';
 class AppRouter {
   static const String login = '/login';
   static const String signUp = '/sign-up';
+  static const String emailVerification = '/email-verification';
   static const String studentHome = '/student-home';
   static const String adminHome = '/admin-home';
 
@@ -17,6 +19,13 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const LoginScreen());
       case signUp:
         return MaterialPageRoute(builder: (_) => const SignUpScreen());
+      case emailVerification:
+        final email = settings.arguments is String
+            ? settings.arguments! as String
+            : '';
+        return MaterialPageRoute(
+          builder: (_) => EmailVerificationScreen(email: email),
+        );
       case studentHome:
         return MaterialPageRoute(builder: (_) => const StudentHomeScreen());
       case adminHome:
