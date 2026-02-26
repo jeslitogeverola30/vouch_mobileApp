@@ -5,6 +5,9 @@ import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/sign_up_screen.dart';
 import '../features/home/screens/admin_home_screen.dart';
 import '../features/home/screens/student_home_screen.dart';
+import '../features/profile/screens/change_email_screen.dart';
+import '../features/profile/screens/change_password_screen.dart';
+import '../features/profile/screens/profile_screen.dart';
 
 class AppRouter {
   static const String login = '/login';
@@ -12,6 +15,9 @@ class AppRouter {
   static const String emailVerification = '/email-verification';
   static const String studentHome = '/student-home';
   static const String adminHome = '/admin-home';
+  static const String profile = '/profile';
+  static const String changeEmail = '/change-email';
+  static const String changePassword = '/change-password';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -30,6 +36,12 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const StudentHomeScreen());
       case adminHome:
         return MaterialPageRoute(builder: (_) => const AdminHomeScreen());
+      case profile:
+        return MaterialPageRoute(builder: (_) => const ProfileScreen());
+      case changeEmail:
+        return MaterialPageRoute(builder: (_) => const ChangeEmailScreen());
+      case changePassword:
+        return MaterialPageRoute(builder: (_) => const ChangePasswordScreen());
       default:
         return MaterialPageRoute(
           builder: (_) =>
