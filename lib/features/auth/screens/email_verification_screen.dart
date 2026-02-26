@@ -69,7 +69,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       return;
     }
 
-    if (authState.user != null || authState.signUp?.status == clerk.Status.complete) {
+    if (authState.user != null ||
+        authState.signUp?.status == clerk.Status.complete) {
       _goToHome();
       return;
     }

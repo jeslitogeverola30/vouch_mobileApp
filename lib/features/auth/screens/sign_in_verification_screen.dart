@@ -72,7 +72,8 @@ class _SignInVerificationScreenState extends State<SignInVerificationScreen> {
       return;
     }
 
-    if (authState.user != null || authState.signIn?.status == clerk.Status.complete) {
+    if (authState.user != null ||
+        authState.signIn?.status == clerk.Status.complete) {
       _goToHome();
       return;
     }
