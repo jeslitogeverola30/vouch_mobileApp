@@ -1,4 +1,3 @@
-import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
@@ -6,6 +5,7 @@ import 'package:ionicons/ionicons.dart';
 import '../../../core/data/local/database_helper.dart';
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../routes/app_router.dart';
+import '../../auth/services/supabase_auth_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String userName;
@@ -56,8 +56,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfileFromLocalDb() async {
-    final authState = ClerkAuth.of(context, listen: false);
-    final email = authState.user?.email ?? widget.userEmail;
+    final email = SupabaseAuthService.currentUser?.email ?? widget.userEmail;
 
     final student = await DatabaseHelper.instance.getStudentByEmail(email);
     if (student == null || !mounted) {
@@ -113,8 +112,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    final authState = ClerkAuth.of(context, listen: false);
-    await authState.safelyCall(context, () => authState.signOut());
+    await SupabaseAuthService.signOut();
 
     if (!mounted) {
       return;

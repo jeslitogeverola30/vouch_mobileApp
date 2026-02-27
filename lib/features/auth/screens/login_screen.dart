@@ -1,9 +1,8 @@
-import 'package:clerk_auth/clerk_auth.dart' as clerk;
-import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../routes/app_router.dart';
+import '../services/supabase_auth_service.dart';
 import 'sign_up_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -41,229 +40,221 @@ class _LoginScreenState extends State<LoginScreen> {
       data: Theme.of(context).copyWith(textTheme: textTheme),
       child: Scaffold(
         backgroundColor: Colors.white,
-        body: ClerkErrorListener(
-          child: SafeArea(
-            child: Stack(
-              children: [
-                Positioned(
-                  top: 70,
-                  right: -50,
-                  child: Container(
-                    width: 210,
-                    height: 210,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFC107).withOpacity(0.16),
-                      borderRadius: BorderRadius.circular(120),
-                    ),
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Positioned(
+                top: 70,
+                right: -50,
+                child: Container(
+                  width: 210,
+                  height: 210,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFC107).withOpacity(0.16),
+                    borderRadius: BorderRadius.circular(120),
                   ),
                 ),
-                Positioned(
-                  bottom: 170,
-                  left: -30,
-                  child: Container(
-                    width: 160,
-                    height: 160,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF003DA5).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(90),
-                    ),
+              ),
+              Positioned(
+                bottom: 170,
+                left: -30,
+                child: Container(
+                  width: 160,
+                  height: 160,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF003DA5).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(90),
                   ),
                 ),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    return SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 24,
+              ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 24,
+                    ),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight - 48,
                       ),
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minHeight: constraints.maxHeight - 48,
-                        ),
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 420),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(24),
-                                border: Border.all(
-                                  color: const Color(
-                                    0xFF003DA5,
-                                  ).withOpacity(0.1),
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.08),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ],
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 420),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: const Color(0xFF003DA5).withOpacity(0.1),
                               ),
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  24,
-                                  28,
-                                  24,
-                                  24,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 6),
                                 ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Image.asset(
-                                          'assets/logos/vouch_logo.png',
-                                          width: 52,
-                                          height: 52,
-                                          fit: BoxFit.contain,
-                                        ),
-                                        const SizedBox(width: 2),
-                                        RichText(
-                                          text: TextSpan(
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 34,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                            children: const [
-                                              TextSpan(
-                                                text: 'ou',
-                                                style: TextStyle(
-                                                  color: Color(0xFF003DA5),
-                                                ),
-                                              ),
-                                              TextSpan(
-                                                text: 'ch',
-                                                style: TextStyle(
-                                                  color: Color(0xFFFFC107),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Welcome back',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 14,
-                                        color: Colors.black54,
-                                        fontWeight: FontWeight.w500,
+                              ],
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                24,
+                                28,
+                                24,
+                                24,
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Image.asset(
+                                        'assets/logos/vouch_logo.png',
+                                        width: 52,
+                                        height: 52,
+                                        fit: BoxFit.contain,
                                       ),
-                                    ),
-                                    const SizedBox(height: 26),
-                                    _buildEmailField(),
-                                    const SizedBox(height: 14),
-                                    _buildPasswordField(),
-                                    const SizedBox(height: 20),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      height: 52,
-                                      child: ElevatedButton(
-                                        onPressed: _isSubmitting
-                                            ? null
-                                            : _handleLogin,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(
-                                            0xFFFFC107,
+                                      const SizedBox(width: 2),
+                                      RichText(
+                                        text: TextSpan(
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 34,
+                                            fontWeight: FontWeight.w700,
                                           ),
-                                          foregroundColor: const Color(
-                                            0xFF003DA5,
-                                          ),
-                                          disabledBackgroundColor: const Color(
-                                            0xFFFFC107,
-                                          ).withOpacity(0.6),
-                                          elevation: 0,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
-                                          ),
-                                        ),
-                                        child: _isSubmitting
-                                            ? const SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  valueColor:
-                                                      AlwaysStoppedAnimation<
-                                                        Color
-                                                      >(Color(0xFF003DA5)),
-                                                ),
-                                              )
-                                            : Text(
-                                                'Login',
-                                                style: GoogleFonts.poppins(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
+                                          children: const [
+                                            TextSpan(
+                                              text: 'ou',
+                                              style: TextStyle(
+                                                color: Color(0xFF003DA5),
                                               ),
+                                            ),
+                                            TextSpan(
+                                              text: 'ch',
+                                              style: TextStyle(
+                                                color: Color(0xFFFFC107),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Welcome back',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 14,
+                                      color: Colors.black54,
+                                      fontWeight: FontWeight.w500,
                                     ),
-                                    const SizedBox(height: 10),
-                                    TextButton(
-                                      onPressed: () {},
-                                      style: TextButton.styleFrom(
+                                  ),
+                                  const SizedBox(height: 26),
+                                  _buildEmailField(),
+                                  const SizedBox(height: 14),
+                                  _buildPasswordField(),
+                                  const SizedBox(height: 20),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 52,
+                                    child: ElevatedButton(
+                                      onPressed: _isSubmitting
+                                          ? null
+                                          : _handleLogin,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(
+                                          0xFFFFC107,
+                                        ),
                                         foregroundColor: const Color(
                                           0xFF003DA5,
                                         ),
+                                        disabledBackgroundColor: const Color(
+                                          0xFFFFC107,
+                                        ).withOpacity(0.6),
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                        ),
                                       ),
-                                      child: Text(
-                                        'Forgot your password?',
+                                      child: _isSubmitting
+                                          ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                      Color
+                                                    >(Color(0xFF003DA5)),
+                                              ),
+                                            )
+                                          : Text(
+                                              'Login',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  TextButton(
+                                    onPressed: () {},
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: const Color(0xFF003DA5),
+                                    ),
+                                    child: Text(
+                                      'Forgot your password?',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        "Don't have an account? ",
                                         style: GoogleFonts.poppins(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w500,
+                                          color: Colors.black87,
                                         ),
                                       ),
-                                    ),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          "Don't have an account? ",
+                                      GestureDetector(
+                                        onTap: () {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  const SignUpScreen(),
+                                            ),
+                                          );
+                                        },
+                                        child: Text(
+                                          'Sign Up',
                                           style: GoogleFonts.poppins(
                                             fontSize: 13,
-                                            fontWeight: FontWeight.w500,
-                                            color: Colors.black87,
+                                            fontWeight: FontWeight.w700,
+                                            color: const Color(0xFF003DA5),
                                           ),
                                         ),
-                                        GestureDetector(
-                                          onTap: () {
-                                            Navigator.of(context).push(
-                                              MaterialPageRoute(
-                                                builder: (_) =>
-                                                    const SignUpScreen(),
-                                              ),
-                                            );
-                                          },
-                                          child: Text(
-                                            'Sign Up',
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w700,
-                                              color: const Color(0xFF003DA5),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ),
                           ),
                         ),
                       ),
-                    );
-                  },
-                ),
-              ],
-            ),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
         ),
       ),
@@ -283,24 +274,43 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isSubmitting = true);
 
-    final authState = ClerkAuth.of(context, listen: false);
-
-    if (authState.user != null || authState.signIn != null) {
-      await authState.safelyCall(context, () => authState.signOut());
-    }
-
-    await authState.safelyCall(context, () => authState.refreshClient());
-
-    await authState.safelyCall(
-      context,
-      () => authState.attemptSignIn(
-        strategy: clerk.Strategy.password,
-        identifier: identifier,
+    try {
+      await SupabaseAuthService.signInWithPassword(
+        email: identifier,
         password: password,
-      ),
-    );
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
 
-    await authState.safelyCall(context, () => authState.refreshClient());
+      final message = error.toString().toLowerCase();
+      final requiresVerification =
+          message.contains('email not confirmed') ||
+          message.contains('email_not_confirmed');
+
+      if (requiresVerification) {
+        await SupabaseAuthService.sendSignInOtp(email: identifier);
+
+        if (!mounted) {
+          return;
+        }
+
+        setState(() => _isSubmitting = false);
+
+        Navigator.of(
+          context,
+        ).pushNamed(AppRouter.signInVerification, arguments: identifier);
+        return;
+      }
+
+      setState(() => _isSubmitting = false);
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      return;
+    }
 
     if (!mounted) {
       return;
@@ -308,29 +318,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isSubmitting = false);
 
-    if (authState.user != null) {
+    if (SupabaseAuthService.currentUser != null) {
       Navigator.of(
         context,
       ).pushNamedAndRemoveUntil(AppRouter.studentHome, (route) => false);
       return;
     }
 
-    final currentSignIn = authState.signIn;
-    final requiresSecondFactor =
-        currentSignIn?.status == clerk.Status.needsSecondFactor;
-
-    if (requiresSecondFactor) {
-      Navigator.of(
-        context,
-      ).pushNamed(AppRouter.signInVerification, arguments: identifier);
-      return;
-    }
-
-    const message = 'Invalid email or password.';
-
+    const fallbackMessage = 'Invalid email or password.';
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ).showSnackBar(const SnackBar(content: Text(fallbackMessage)));
   }
 
   Widget _buildEmailField() {

@@ -1,11 +1,10 @@
-import 'package:clerk_auth/clerk_auth.dart' as clerk;
-import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/data/local/database_helper.dart';
 import '../../../routes/app_router.dart';
+import '../services/supabase_auth_service.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -100,208 +99,199 @@ class _SignUpScreenState extends State<SignUpScreen> {
       data: Theme.of(context).copyWith(textTheme: textTheme),
       child: Scaffold(
         backgroundColor: white,
-        body: ClerkErrorListener(
-          child: SafeArea(
-            child: Stack(
-              children: [
-                _buildBackgroundShapes(context),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    return SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 24,
-                      ),
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 460),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(
-                                color: royalBlue.withOpacity(0.1),
-                                width: 1.2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.08),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
+        body: SafeArea(
+          child: Stack(
+            children: [
+              _buildBackgroundShapes(context),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 24,
+                    ),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 460),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: royalBlue.withOpacity(0.1),
+                              width: 1.2,
                             ),
-                            padding: const EdgeInsets.fromLTRB(24, 24, 24, 22),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Center(
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Image.asset(
-                                        'assets/logos/vouch_logo.png',
-                                        width: 44,
-                                        height: 44,
-                                        fit: BoxFit.contain,
-                                      ),
-                                      const SizedBox(width: 2),
-                                      RichText(
-                                        text: TextSpan(
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 30,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                          children: const [
-                                            TextSpan(
-                                              text: 'ou',
-                                              style: TextStyle(
-                                                color: royalBlue,
-                                              ),
-                                            ),
-                                            TextSpan(
-                                              text: 'ch',
-                                              style: TextStyle(color: gold),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Center(
-                                  child: Text(
-                                    'Create your account',
-                                    style: GoogleFonts.poppins(
-                                      color: Colors.black54,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.08),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.fromLTRB(24, 24, 24, 22),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Center(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Image.asset(
+                                      'assets/logos/vouch_logo.png',
+                                      width: 44,
+                                      height: 44,
+                                      fit: BoxFit.contain,
                                     ),
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
-                                _buildLabel('Faculty'),
-                                _buildDropdown(
-                                  hint: 'Select Faculty',
-                                  value: selectedFaculty,
-                                  items: faculties,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      selectedFaculty = value;
-                                      selectedDegree = null;
-                                    });
-                                  },
-                                ),
-                                const SizedBox(height: 16),
-                                _buildLabel("Program"),
-                                _buildDropdown(
-                                  hint: selectedFaculty == null
-                                      ? 'Select Faculty first'
-                                      : 'Select Degree',
-                                  value: selectedDegree,
-                                  items: availableDegrees,
-                                  onChanged: availableDegrees.isEmpty
-                                      ? null
-                                      : (value) {
-                                          setState(
-                                            () => selectedDegree = value,
-                                          );
-                                        },
-                                ),
-                                const SizedBox(height: 16),
-                                _buildLabel('Full Name'),
-                                _buildTextField(
-                                  controller: fullNameController,
-                                  hint: 'Enter Full Name',
-                                  prefixIcon: Icons.person_outline,
-                                ),
-                                const SizedBox(height: 16),
-                                _buildLabel('School ID No.'),
-                                _buildTextField(
-                                  controller: schoolIDController,
-                                  hint: 'XXXX-XXXX',
-                                  maxLength: 9,
-                                  keyboardType: TextInputType.number,
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.digitsOnly,
-                                    _SchoolIdFormatter(),
+                                    const SizedBox(width: 2),
+                                    RichText(
+                                      text: TextSpan(
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 30,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        children: const [
+                                          TextSpan(
+                                            text: 'ou',
+                                            style: TextStyle(color: royalBlue),
+                                          ),
+                                          TextSpan(
+                                            text: 'ch',
+                                            style: TextStyle(color: gold),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ],
                                 ),
-                                const SizedBox(height: 16),
-                                _buildLabel('Email'),
-                                _buildTextField(
-                                  controller: emailController,
-                                  hint: 'Enter Email',
-                                  prefixIcon: Icons.mail_outline,
-                                  keyboardType: TextInputType.emailAddress,
-                                ),
-                                const SizedBox(height: 16),
-                                _buildLabel('Password'),
-                                _buildPasswordField(
-                                  controller: passwordController,
-                                  hint: 'Enter Password',
-                                  isVisible: showPassword,
-                                  onToggle: () {
-                                    setState(
-                                      () => showPassword = !showPassword,
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 16),
-                                _buildLabel('Confirm Password'),
-                                _buildPasswordField(
-                                  controller: confirmPasswordController,
-                                  hint: 'Re-enter Password',
-                                  isVisible: showConfirmPassword,
-                                  onToggle: () {
-                                    setState(() {
-                                      showConfirmPassword =
-                                          !showConfirmPassword;
-                                    });
-                                  },
-                                ),
-                                const SizedBox(height: 22),
-                                _buildSignUpButton(context),
-                                const SizedBox(height: 10),
-                                Center(
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        'Already have an account? ',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w500,
-                                          color: darkText,
-                                        ),
-                                      ),
-                                      GestureDetector(
-                                        onTap: () {
-                                          Navigator.of(context).pop();
-                                        },
-                                        child: Text(
-                                          'Sign In',
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w700,
-                                            color: royalBlue,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                              ),
+                              const SizedBox(height: 8),
+                              Center(
+                                child: Text(
+                                  'Create your account',
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.black54,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                              const SizedBox(height: 24),
+                              _buildLabel('Faculty'),
+                              _buildDropdown(
+                                hint: 'Select Faculty',
+                                value: selectedFaculty,
+                                items: faculties,
+                                onChanged: (value) {
+                                  setState(() {
+                                    selectedFaculty = value;
+                                    selectedDegree = null;
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                              _buildLabel('Program'),
+                              _buildDropdown(
+                                hint: selectedFaculty == null
+                                    ? 'Select Faculty first'
+                                    : 'Select Degree',
+                                value: selectedDegree,
+                                items: availableDegrees,
+                                onChanged: availableDegrees.isEmpty
+                                    ? null
+                                    : (value) {
+                                        setState(() => selectedDegree = value);
+                                      },
+                              ),
+                              const SizedBox(height: 16),
+                              _buildLabel('Full Name'),
+                              _buildTextField(
+                                controller: fullNameController,
+                                hint: 'Enter Full Name',
+                                prefixIcon: Icons.person_outline,
+                              ),
+                              const SizedBox(height: 16),
+                              _buildLabel('School ID No.'),
+                              _buildTextField(
+                                controller: schoolIDController,
+                                hint: 'XXXX-XXXX',
+                                maxLength: 9,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  _SchoolIdFormatter(),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              _buildLabel('Email'),
+                              _buildTextField(
+                                controller: emailController,
+                                hint: 'Enter Email',
+                                prefixIcon: Icons.mail_outline,
+                                keyboardType: TextInputType.emailAddress,
+                              ),
+                              const SizedBox(height: 16),
+                              _buildLabel('Password'),
+                              _buildPasswordField(
+                                controller: passwordController,
+                                hint: 'Enter Password',
+                                isVisible: showPassword,
+                                onToggle: () {
+                                  setState(() => showPassword = !showPassword);
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                              _buildLabel('Confirm Password'),
+                              _buildPasswordField(
+                                controller: confirmPasswordController,
+                                hint: 'Re-enter Password',
+                                isVisible: showConfirmPassword,
+                                onToggle: () {
+                                  setState(() {
+                                    showConfirmPassword = !showConfirmPassword;
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 22),
+                              _buildSignUpButton(context),
+                              const SizedBox(height: 10),
+                              Center(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Already have an account? ',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        color: darkText,
+                                      ),
+                                    ),
+                                    GestureDetector(
+                                      onTap: () {
+                                        Navigator.of(context).pop();
+                                      },
+                                      child: Text(
+                                        'Sign In',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: royalBlue,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    );
-                  },
-                ),
-              ],
-            ),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
         ),
       ),
@@ -357,26 +347,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     setState(() => isSubmitting = true);
 
-    final authState = ClerkAuth.of(context, listen: false);
-
-    await authState.safelyCall(
-      context,
-      () => authState.attemptSignUp(
-        strategy: clerk.Strategy.password,
+    try {
+      await SupabaseAuthService.signUp(
+        email: email,
+        password: password,
         firstName: firstName,
         lastName: lastName,
-        emailAddress: email,
-        password: password,
-        passwordConfirmation: confirmPassword,
-      ),
-    );
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
 
-    if (!mounted) {
-      return;
-    }
-
-    if (authState.signUp == null) {
       setState(() => isSubmitting = false);
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
       return;
     }
 
@@ -400,12 +387,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       );
       return;
     }
-
-    await authState.safelyCall(
-      context,
-      () => authState.attemptSignUp(strategy: clerk.Strategy.emailCode),
-    );
-
     if (!mounted) {
       return;
     }
