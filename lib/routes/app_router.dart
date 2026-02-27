@@ -4,6 +4,7 @@ import '../features/auth/screens/email_verification_screen.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/sign_in_verification_screen.dart';
 import '../features/auth/screens/sign_up_screen.dart';
+import '../features/events/screens/events_main_screen.dart';
 import '../features/home/screens/admin_home_screen.dart';
 import '../features/home/screens/student_home_screen.dart';
 import '../features/profile/screens/change_email_screen.dart';
@@ -17,6 +18,7 @@ class AppRouter {
   static const String signUp = '/sign-up';
   static const String emailVerification = '/email-verification';
   static const String signInVerification = '/sign-in-verification';
+  static const String events = '/events';
   static const String studentHome = '/student-home';
   static const String adminHome = '/admin-home';
   static const String myQrCode = '/my-qr-code';
@@ -45,6 +47,8 @@ class AppRouter {
         return MaterialPageRoute(
           builder: (_) => SignInVerificationScreen(email: email),
         );
+      case events:
+        return MaterialPageRoute(builder: (_) => const EventsScreen());
       case studentHome:
         return MaterialPageRoute(builder: (_) => const StudentHomeScreen());
       case adminHome:
