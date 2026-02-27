@@ -8,8 +8,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
-    url: const String.fromEnvironment('SUPABASE_URL'),
-    anonKey: const String.fromEnvironment('SUPABASE_ANON_KEY'),
+    url: const String.fromEnvironment('https://iughctuvswasmttswwnk.supabase.co'),
+    anonKey: const String.fromEnvironment('sb_publishable_j7Wwu5oPpslcgsEftBSY9A_RegZBX5F'),
   );
 
   runApp(const VouchMobileApp());
