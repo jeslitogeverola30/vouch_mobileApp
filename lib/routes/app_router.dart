@@ -10,6 +10,7 @@ import '../features/profile/screens/change_email_screen.dart';
 import '../features/profile/screens/change_password_screen.dart';
 import '../features/profile/screens/profile_screen.dart';
 import '../features/profile/screens/students_database_screen.dart';
+import '../features/qr_code/screens/my_qr_code_screen.dart';
 
 class AppRouter {
   static const String login = '/login';
@@ -18,6 +19,7 @@ class AppRouter {
   static const String signInVerification = '/sign-in-verification';
   static const String studentHome = '/student-home';
   static const String adminHome = '/admin-home';
+  static const String myQrCode = '/my-qr-code';
   static const String profile = '/profile';
   static const String changeEmail = '/change-email';
   static const String changePassword = '/change-password';
@@ -47,6 +49,8 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const StudentHomeScreen());
       case adminHome:
         return MaterialPageRoute(builder: (_) => const AdminHomeScreen());
+      case myQrCode:
+        return MaterialPageRoute(builder: (_) => const QRScreen());
       case profile:
         return MaterialPageRoute(builder: (_) => const ProfileScreen());
       case changeEmail:
