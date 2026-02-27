@@ -10,6 +10,10 @@ class SupabaseAuthService {
   static Future<AuthResponse> signUp({
     required String email,
     required String password,
+    String? fullName,
+    String? studentId,
+    String? faculty,
+    String? program,
     String? firstName,
     String? lastName,
   }) {
@@ -17,6 +21,10 @@ class SupabaseAuthService {
       email: email,
       password: password,
       data: {
+        if (fullName != null && fullName.isNotEmpty) 'full_name': fullName,
+        if (studentId != null && studentId.isNotEmpty) 'student_id': studentId,
+        if (faculty != null && faculty.isNotEmpty) 'faculty': faculty,
+        if (program != null && program.isNotEmpty) 'program': program,
         if (firstName != null && firstName.isNotEmpty) 'first_name': firstName,
         if (lastName != null && lastName.isNotEmpty) 'last_name': lastName,
       },

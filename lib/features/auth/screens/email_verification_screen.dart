@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../profile/services/supabase_profile_service.dart';
 import '../../../routes/app_router.dart';
 import '../services/supabase_auth_service.dart';
 
@@ -29,7 +31,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       }
 
       if (SupabaseAuthService.currentUser != null) {
-        _goToHome();
+        _syncProfileAndGoHome();
       }
     });
   }
@@ -42,9 +44,9 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
 
   Future<void> _verifyCode() async {
     final code = _codeController.text.trim();
-    if (code.isEmpty) {
+    if (!RegExp(r'^\d{8}$').hasMatch(code)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter the verification code.')),
+        const SnackBar(content: Text('Enter the 8-digit verification code.')),
       );
       return;
     }
@@ -73,7 +75,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     }
 
     if (SupabaseAuthService.currentUser != null) {
-      _goToHome();
+      await _syncProfileAndGoHome();
       return;
     }
 
@@ -88,6 +90,27 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     Navigator.of(
       context,
     ).pushNamedAndRemoveUntil(AppRouter.studentHome, (route) => false);
+  }
+
+  Future<void> _syncProfileAndGoHome() async {
+    try {
+      await SupabaseProfileService.ensureCurrentUserProfile();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to save profile: $error')));
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    _goToHome();
   }
 
   Future<void> _resendCode() async {
@@ -265,7 +288,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                                     ),
                                     const SizedBox(height: 6),
                                     Text(
-                                      'Enter the 6-digit code sent to',
+                                      'Enter the 8-digit code sent to',
                                       style: GoogleFonts.poppins(
                                         fontSize: 13,
                                         color: Colors.black54,
@@ -287,8 +310,11 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                                     TextField(
                                       controller: _codeController,
                                       keyboardType: TextInputType.number,
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                      ],
                                       textInputAction: TextInputAction.done,
-                                      maxLength: 6,
+                                      maxLength: 8,
                                       textAlign: TextAlign.center,
                                       onSubmitted: (_) {
                                         if (!_isSubmitting) {
@@ -296,7 +322,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                                         }
                                       },
                                       decoration: InputDecoration(
-                                        hintText: '6-digit code',
+                                        hintText: '8-digit code',
                                         counterText: '',
                                         hintStyle: GoogleFonts.poppins(
                                           color: Colors.grey.shade500,

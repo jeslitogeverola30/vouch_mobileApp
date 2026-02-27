@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/data/local/database_helper.dart';
+import '../services/supabase_profile_service.dart';
 
 class StudentsDatabaseScreen extends StatefulWidget {
   const StudentsDatabaseScreen({super.key});
@@ -16,13 +17,24 @@ class _StudentsDatabaseScreenState extends State<StudentsDatabaseScreen> {
   @override
   void initState() {
     super.initState();
-    _studentsFuture = DatabaseHelper.instance.getAllStudents();
+    _studentsFuture = _loadStudents();
   }
 
   Future<void> _refresh() async {
     setState(() {
-      _studentsFuture = DatabaseHelper.instance.getAllStudents();
+      _studentsFuture = _loadStudents();
     });
+  }
+
+  Future<List<Map<String, dynamic>>> _loadStudents() async {
+    try {
+      final profiles = await SupabaseProfileService.getAllProfiles();
+      if (profiles.isNotEmpty) {
+        return profiles;
+      }
+    } catch (_) {}
+
+    return DatabaseHelper.instance.getAllStudents();
   }
 
   @override
@@ -33,7 +45,7 @@ class _StudentsDatabaseScreenState extends State<StudentsDatabaseScreen> {
       ),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Local Students DB'),
+          title: const Text('Students Database'),
           backgroundColor: Colors.white,
           foregroundColor: const Color(0xFF003DA5),
           elevation: 0,
