@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
 
+import '../../../core/data/local/database_helper.dart';
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../routes/app_router.dart';
 import '../../auth/services/supabase_auth_service.dart';
@@ -34,6 +35,42 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   int _selectedIndex = 4; // Profile tab is selected
+  late String _userName;
+  late String _userEmail;
+  late String _studentId;
+  late String _faculty;
+  late String _program;
+
+  @override
+  void initState() {
+    super.initState();
+    _userName = widget.userName;
+    _userEmail = widget.userEmail;
+    _studentId = widget.studentId;
+    _faculty = widget.faculty;
+    _program = widget.program;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadProfileFromLocalDb();
+    });
+  }
+
+  Future<void> _loadProfileFromLocalDb() async {
+    final email = SupabaseAuthService.currentUser?.email ?? widget.userEmail;
+
+    final student = await DatabaseHelper.instance.getStudentByEmail(email);
+    if (student == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _userName = (student['full_name'] as String? ?? widget.userName);
+      _userEmail = (student['email'] as String? ?? email);
+      _studentId = (student['student_id'] as String? ?? widget.studentId);
+      _faculty = (student['faculty'] as String? ?? widget.faculty);
+      _program = (student['program'] as String? ?? widget.program);
+    });
+  }
 
   void _onNavItemTapped(int index) {
     if (index == _selectedIndex) {
@@ -189,19 +226,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _buildInfoCard(
                           icon: Ionicons.card_outline,
                           label: 'Student ID',
-                          value: widget.studentId,
+                          value: _studentId,
                         ),
                         const SizedBox(height: 12),
                         _buildInfoCard(
                           icon: Ionicons.people,
                           label: 'Faculty',
-                          value: widget.faculty,
+                          value: _faculty,
                         ),
                         const SizedBox(height: 12),
                         _buildInfoCard(
                           icon: Ionicons.school_outline,
                           label: 'Program',
-                          value: widget.program,
+                          value: _program,
                         ),
                         const SizedBox(height: 12),
                         _buildAccountActionButton(
@@ -247,6 +284,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             Navigator.pushNamed(
                               context,
                               AppRouter.changePassword,
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _buildAccountActionButton(
+                          icon: Ionicons.server_outline,
+                          title: 'View Local Students DB',
+                          subtitle: 'See saved student records on this device',
+                          onTap: () {
+                            Navigator.pushNamed(
+                              context,
+                              AppRouter.studentsDatabase,
                             );
                           },
                         ),
@@ -327,7 +376,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            widget.userName,
+            _userName,
             style: const TextStyle(
               color: Color(0xFF003DA5),
               fontSize: 21,
@@ -336,7 +385,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            widget.userEmail,
+            _userEmail,
             style: const TextStyle(color: Colors.black54, fontSize: 13),
           ),
           const SizedBox(height: 12),
