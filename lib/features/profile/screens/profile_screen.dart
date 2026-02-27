@@ -105,6 +105,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
+    if (index == 3) {
+      Navigator.pushReplacementNamed(context, AppRouter.payments);
+      return;
+    }
+
     setState(() {
       _selectedIndex = index;
     });

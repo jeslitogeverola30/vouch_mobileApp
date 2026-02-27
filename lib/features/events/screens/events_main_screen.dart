@@ -206,6 +206,11 @@ class _EventsScreenState extends State<EventsScreen>
       return;
     }
 
+    if (index == 3) {
+      Navigator.pushReplacementNamed(context, AppRouter.payments);
+      return;
+    }
+
     if (index == 4) {
       Navigator.pushReplacementNamed(context, AppRouter.profile);
       return;
