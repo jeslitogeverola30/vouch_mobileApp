@@ -1,10 +1,10 @@
-import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
 
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../routes/app_router.dart';
+import '../../auth/services/supabase_auth_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String userName;
@@ -75,8 +75,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    final authState = ClerkAuth.of(context, listen: false);
-    await authState.safelyCall(context, () => authState.signOut());
+    await SupabaseAuthService.signOut();
 
     if (!mounted) {
       return;
@@ -135,7 +134,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               height: 108,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 4),
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 4,
+                                ),
                                 boxShadow: [
                                   BoxShadow(
                                     color: Colors.black.withOpacity(0.1),
@@ -358,7 +360,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildSectionHeader({required String title, required String subtitle}) {
+  Widget _buildSectionHeader({
+    required String title,
+    required String subtitle,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
