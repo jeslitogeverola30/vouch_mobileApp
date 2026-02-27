@@ -95,6 +95,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
+    if (index == 1) {
+      Navigator.pushReplacementNamed(context, AppRouter.events);
+      return;
+    }
+
     if (index == 2) {
       Navigator.pushReplacementNamed(context, AppRouter.myQrCode);
       return;

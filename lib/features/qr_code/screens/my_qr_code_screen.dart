@@ -225,6 +225,11 @@ class _QRScreenState extends State<QRScreen> {
               return;
             }
 
+            if (index == 1) {
+              Navigator.pushReplacementNamed(context, AppRouter.events);
+              return;
+            }
+
             if (index == 4) {
               Navigator.pushReplacementNamed(context, AppRouter.profile);
               return;
