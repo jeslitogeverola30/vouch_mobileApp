@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../profile/services/supabase_profile_service.dart';
 import '../../../routes/app_router.dart';
 import '../services/supabase_auth_service.dart';
 import 'sign_up_screen.dart';
@@ -319,6 +320,10 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isSubmitting = false);
 
     if (SupabaseAuthService.currentUser != null) {
+      try {
+        await SupabaseProfileService.ensureCurrentUserProfile();
+      } catch (_) {}
+
       Navigator.of(
         context,
       ).pushNamedAndRemoveUntil(AppRouter.studentHome, (route) => false);

@@ -6,6 +6,7 @@ import '../../../core/data/local/database_helper.dart';
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../routes/app_router.dart';
 import '../../auth/services/supabase_auth_service.dart';
+import '../services/supabase_profile_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String userName;
@@ -58,17 +59,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadProfileFromLocalDb() async {
     final email = SupabaseAuthService.currentUser?.email ?? widget.userEmail;
 
-    final student = await DatabaseHelper.instance.getStudentByEmail(email);
+    Map<String, dynamic>? student;
+
+    try {
+      student = await SupabaseProfileService.getCurrentUserProfile();
+    } catch (_) {
+      student = null;
+    }
+
+    student ??= await DatabaseHelper.instance.getStudentByEmail(email);
+
     if (student == null || !mounted) {
       return;
     }
 
+    final currentStudent = student;
+
     setState(() {
-      _userName = (student['full_name'] as String? ?? widget.userName);
-      _userEmail = (student['email'] as String? ?? email);
-      _studentId = (student['student_id'] as String? ?? widget.studentId);
-      _faculty = (student['faculty'] as String? ?? widget.faculty);
-      _program = (student['program'] as String? ?? widget.program);
+      _userName = (currentStudent['full_name'] as String? ?? widget.userName);
+      _userEmail = (currentStudent['email'] as String? ?? email);
+      _studentId =
+          (currentStudent['student_id'] as String? ?? widget.studentId);
+      _faculty = (currentStudent['faculty'] as String? ?? widget.faculty);
+      _program = (currentStudent['program'] as String? ?? widget.program);
     });
   }
 

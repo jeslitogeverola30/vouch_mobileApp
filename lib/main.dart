@@ -8,8 +8,14 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
-    url: const String.fromEnvironment('https://iughctuvswasmttswwnk.supabase.co'),
-    anonKey: const String.fromEnvironment('sb_publishable_j7Wwu5oPpslcgsEftBSY9A_RegZBX5F'),
+    url: const String.fromEnvironment(
+      'SUPABASE_URL',
+      defaultValue: 'https://iughctuvswasmttswwnk.supabase.co',
+    ),
+    anonKey: const String.fromEnvironment(
+      'SUPABASE_ANON_KEY',
+      defaultValue: 'sb_publishable_j7Wwu5oPpslcgsEftBSY9A_RegZBX5F',
+    ),
   );
 
   runApp(const VouchMobileApp());
@@ -20,11 +26,13 @@ class VouchMobileApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasSession = Supabase.instance.client.auth.currentUser != null;
+
     return MaterialApp(
       title: 'Vouch Mobile App',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
-      initialRoute: AppRouter.login,
+      initialRoute: hasSession ? AppRouter.studentHome : AppRouter.login,
       onGenerateRoute: AppRouter.onGenerateRoute,
     );
   }

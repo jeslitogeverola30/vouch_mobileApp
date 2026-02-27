@@ -1,10 +1,11 @@
-import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
 
 import '../../../core/data/local/database_helper.dart';
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
+import '../../auth/services/supabase_auth_service.dart';
+import '../../profile/services/supabase_profile_service.dart';
 import '../../../routes/app_router.dart';
 
 class StudentHomeScreen extends StatefulWidget {
@@ -41,13 +42,21 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
   }
 
   Future<void> _loadStudentData() async {
-    final authState = ClerkAuth.of(context, listen: false);
-    final email = authState.user?.email;
+    final email = SupabaseAuthService.currentUser?.email;
     if (email == null || email.isEmpty) {
       return;
     }
 
-    final student = await DatabaseHelper.instance.getStudentByEmail(email);
+    Map<String, dynamic>? student;
+
+    try {
+      student = await SupabaseProfileService.getCurrentUserProfile();
+    } catch (_) {
+      student = null;
+    }
+
+    student ??= await DatabaseHelper.instance.getStudentByEmail(email);
+
     if (student == null || !mounted) {
       return;
     }

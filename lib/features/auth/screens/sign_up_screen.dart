@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../core/data/local/database_helper.dart';
 import '../../../routes/app_router.dart';
 import '../services/supabase_auth_service.dart';
 
@@ -351,6 +350,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
       await SupabaseAuthService.signUp(
         email: email,
         password: password,
+        fullName: fullName,
+        studentId: schoolId,
+        faculty: faculty,
+        program: program,
         firstName: firstName,
         lastName: lastName,
       );
@@ -367,26 +370,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
-    try {
-      await DatabaseHelper.instance.insertStudent(
-        studentId: schoolId,
-        fullName: fullName,
-        faculty: faculty,
-        program: program,
-        email: email,
-        rawPassword: password,
-      );
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() => isSubmitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to save local student record.')),
-      );
-      return;
-    }
     if (!mounted) {
       return;
     }
