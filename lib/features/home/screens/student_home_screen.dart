@@ -143,6 +143,11 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
               return;
             }
 
+            if (index == 2) {
+              Navigator.pushReplacementNamed(context, AppRouter.myQrCode);
+              return;
+            }
+
             if (index == 4) {
               Navigator.pushReplacementNamed(context, AppRouter.profile);
               return;
