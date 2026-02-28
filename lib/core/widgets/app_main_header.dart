@@ -7,11 +7,13 @@ import '../../routes/app_router.dart';
 class AppMainHeader extends StatelessWidget {
   final String avatarPath;
   final VoidCallback? onAvatarTap;
+  final VoidCallback? onSearchTap;
 
   const AppMainHeader({
     super.key,
     this.avatarPath = 'assets/images/my_profile.png',
     this.onAvatarTap,
+    this.onSearchTap,
   });
 
   @override
@@ -57,7 +59,11 @@ class AppMainHeader extends StatelessWidget {
             children: [
               IconButton(
                 icon: const Icon(Ionicons.search, color: Color(0xFF003DA5)),
-                onPressed: () {},
+                onPressed: () {
+                  if (onSearchTap != null) {
+                    onSearchTap!();
+                  }
+                },
               ),
               IconButton(
                 icon: const Icon(

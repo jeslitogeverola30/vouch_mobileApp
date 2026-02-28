@@ -59,8 +59,14 @@ class AppRouter {
           builder: (_) => ForgotPasswordScreen(initialEmail: email),
         );
       case events:
+        final initialEventsTabIndex = settings.arguments is int
+            ? settings.arguments! as int
+            : 0;
         return MaterialPageRoute(
-          builder: (_) => const MainShellScreen(initialIndex: 1),
+          builder: (_) => MainShellScreen(
+            initialIndex: 1,
+            initialEventsTabIndex: initialEventsTabIndex,
+          ),
         );
       case payments:
         return MaterialPageRoute(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
 
+import '../../../core/utils/global_header_search.dart';
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../core/widgets/app_main_header.dart';
 import '../../../routes/app_router.dart';
@@ -15,8 +16,13 @@ const Color lightBlue = Color(0xFFE3F2FD);
 
 class EventsScreen extends StatefulWidget {
   final bool showChrome;
+  final int initialTabIndex;
 
-  const EventsScreen({super.key, this.showChrome = true});
+  const EventsScreen({
+    super.key,
+    this.showChrome = true,
+    this.initialTabIndex = 0,
+  });
 
   @override
   State<EventsScreen> createState() => _EventsScreenState();
@@ -31,7 +37,11 @@ class _EventsScreenState extends State<EventsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this, initialIndex: 0);
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+      initialIndex: widget.initialTabIndex.clamp(0, 3),
+    );
   }
 
   @override
@@ -93,7 +103,8 @@ class _EventsScreenState extends State<EventsScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.showChrome) const AppMainHeader(),
+        if (widget.showChrome)
+          AppMainHeader(onSearchTap: () => openGlobalHeaderSearch(context)),
         if (widget.showChrome) const SizedBox(height: 6),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),

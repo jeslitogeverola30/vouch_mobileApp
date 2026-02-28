@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
 
 import '../../../core/data/local/database_helper.dart';
+import '../../../core/utils/global_header_search.dart';
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../core/widgets/app_main_header.dart';
 import '../../../routes/app_router.dart';
@@ -275,7 +276,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.showChrome) AppMainHeader(avatarPath: widget.avatarPath),
+        if (widget.showChrome)
+          AppMainHeader(
+            avatarPath: widget.avatarPath,
+            onSearchTap: () => openGlobalHeaderSearch(context),
+          ),
         Expanded(
           child: SingleChildScrollView(
             child: Column(

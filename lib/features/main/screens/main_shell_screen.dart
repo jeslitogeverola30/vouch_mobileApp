@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../core/utils/global_header_search.dart';
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../core/widgets/app_main_header.dart';
 import '../../events/screens/events_main_screen.dart';
@@ -12,8 +13,13 @@ import '../../qr_code/screens/my_qr_code_screen.dart';
 
 class MainShellScreen extends StatefulWidget {
   final int initialIndex;
+  final int initialEventsTabIndex;
 
-  const MainShellScreen({super.key, this.initialIndex = 0});
+  const MainShellScreen({
+    super.key,
+    this.initialIndex = 0,
+    this.initialEventsTabIndex = 0,
+  });
 
   @override
   State<MainShellScreen> createState() => _MainShellScreenState();
@@ -75,6 +81,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
             child: Column(
               children: [
                 AppMainHeader(
+                  onSearchTap: () => openGlobalHeaderSearch(context),
                   onAvatarTap: () {
                     if (_currentIndex == 4) {
                       return;
@@ -87,12 +94,15 @@ class _MainShellScreenState extends State<MainShellScreen> {
                 Expanded(
                   child: IndexedStack(
                     index: _currentIndex,
-                    children: const [
-                      StudentHomeScreen(showChrome: false),
-                      EventsScreen(showChrome: false),
-                      QRScreen(showChrome: false),
-                      PaymentsScreen(showChrome: false),
-                      ProfileScreen(showChrome: false),
+                    children: [
+                      const StudentHomeScreen(showChrome: false),
+                      EventsScreen(
+                        showChrome: false,
+                        initialTabIndex: widget.initialEventsTabIndex,
+                      ),
+                      const QRScreen(showChrome: false),
+                      const PaymentsScreen(showChrome: false),
+                      const ProfileScreen(showChrome: false),
                     ],
                   ),
                 ),
