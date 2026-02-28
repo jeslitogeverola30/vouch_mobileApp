@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../features/auth/screens/email_verification_screen.dart';
+import '../features/auth/screens/forgot_password_screen.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/sign_in_verification_screen.dart';
 import '../features/auth/screens/sign_up_screen.dart';
@@ -17,6 +18,7 @@ class AppRouter {
   static const String signUp = '/sign-up';
   static const String emailVerification = '/email-verification';
   static const String signInVerification = '/sign-in-verification';
+  static const String forgotPassword = '/forgot-password';
   static const String events = '/events';
   static const String payments = '/payments';
   static const String studentHome = '/student-home';
@@ -48,6 +50,13 @@ class AppRouter {
             : '';
         return MaterialPageRoute(
           builder: (_) => SignInVerificationScreen(email: email),
+        );
+      case forgotPassword:
+        final email = settings.arguments is String
+            ? settings.arguments! as String
+            : '';
+        return MaterialPageRoute(
+          builder: (_) => ForgotPasswordScreen(initialEmail: email),
         );
       case events:
         return MaterialPageRoute(
