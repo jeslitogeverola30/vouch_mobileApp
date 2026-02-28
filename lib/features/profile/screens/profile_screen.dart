@@ -35,7 +35,9 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  int _selectedIndex = 4; // Profile tab is selected
+  int _selectedIndex = 4;
+  bool _isLoggingOut = false;
+
   late String _userName;
   late String _userEmail;
   late String _studentId;
@@ -52,15 +54,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _program = widget.program;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadProfileFromLocalDb();
+      _loadProfile();
     });
   }
 
-  Future<void> _loadProfileFromLocalDb() async {
+  Future<void> _loadProfile() async {
     final email = SupabaseAuthService.currentUser?.email ?? widget.userEmail;
 
     Map<String, dynamic>? student;
-
     try {
       student = await SupabaseProfileService.getCurrentUserProfile();
     } catch (_) {
@@ -73,15 +74,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    final currentStudent = student;
-
     setState(() {
-      _userName = (currentStudent['full_name'] as String? ?? widget.userName);
-      _userEmail = (currentStudent['email'] as String? ?? email);
-      _studentId =
-          (currentStudent['student_id'] as String? ?? widget.studentId);
-      _faculty = (currentStudent['faculty'] as String? ?? widget.faculty);
-      _program = (currentStudent['program'] as String? ?? widget.program);
+      _userName = (student!['full_name'] as String? ?? widget.userName);
+      _userEmail = (student['email'] as String? ?? email);
+      _studentId = (student['student_id'] as String? ?? widget.studentId);
+      _faculty = (student['faculty'] as String? ?? widget.faculty);
+      _program = (student['program'] as String? ?? widget.program);
     });
   }
 
@@ -116,44 +114,113 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _handleLogout() async {
-    final shouldLogout = await showDialog<bool>(
+    final shouldLogout = await showModalBottomSheet<bool>(
       context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Logout'),
-          content: const Text('Are you sure you want to logout?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Logout'),
-            ),
-          ],
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.black12,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Logout',
+                style: TextStyle(
+                  color: Color(0xFF003DA5),
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Are you sure you want to logout from this device?',
+                style: TextStyle(
+                  color: Colors.black54,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF003DA5),
+                        side: BorderSide(
+                          color: const Color(0xFF003DA5).withOpacity(0.25),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFB3261E),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text('Logout'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         );
       },
     );
 
-    if (shouldLogout != true) {
+    if (shouldLogout != true || _isLoggingOut) {
       return;
     }
 
-    await SupabaseAuthService.signOut();
+    setState(() {
+      _isLoggingOut = true;
+    });
 
-    if (!mounted) {
-      return;
+    try {
+      await SupabaseAuthService.signOut();
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil(AppRouter.login, (route) => false);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoggingOut = false;
+        });
+      }
     }
-
-    Navigator.of(
-      context,
-    ).pushNamedAndRemoveUntil(AppRouter.login, (route) => false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
     final textTheme = GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme);
 
     return Theme(
@@ -162,216 +229,137 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundColor: Colors.white,
         body: Stack(
           children: [
-            SingleChildScrollView(
+            Positioned(
+              top: 100,
+              right: -50,
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFC107).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(100),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 260,
+              left: -30,
+              child: Container(
+                width: 150,
+                height: 150,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF003DA5).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(75),
+                ),
+              ),
+            ),
+            SafeArea(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(
-                    height: screenHeight * 0.25,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        ClipRRect(
-                          borderRadius: const BorderRadius.only(
-                            bottomRight: Radius.circular(20),
+                  _buildHeader(),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: _buildProfileSummaryCard(),
                           ),
-                          child: SizedBox(
-                            width: double.infinity,
-                            height: screenHeight * 0.2,
-                            child: Image.asset(
-                              widget.bannerPath,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  color: const Color(0xFF003DA5),
-                                );
-                              },
-                            ),
+                          const SizedBox(height: 22),
+                          _buildSectionHeader(
+                            title: 'Academic Details',
+                            subtitle: 'Your student profile information',
                           ),
-                        ),
-                        Positioned(
-                          bottom: -36,
-                          left: 0,
-                          right: 0,
-                          child: Center(
-                            child: Container(
-                              width: 108,
-                              height: 108,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: 4,
+                          const SizedBox(height: 12),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: Column(
+                              children: [
+                                _buildInfoCard(
+                                  icon: Ionicons.card_outline,
+                                  label: 'Student ID',
+                                  value: _studentId,
                                 ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 5),
-                                  ),
-                                ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(54),
-                                child: Image.asset(
-                                  widget.avatarPath,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      color: const Color(0xFFE8F0F8),
-                                      child: const Center(
-                                        child: Icon(
-                                          Ionicons.person,
-                                          size: 50,
-                                          color: Color(0xFF003DA5),
-                                        ),
-                                      ),
+                                const SizedBox(height: 12),
+                                _buildInfoCard(
+                                  icon: Ionicons.people,
+                                  label: 'Faculty',
+                                  value: _faculty,
+                                ),
+                                const SizedBox(height: 12),
+                                _buildInfoCard(
+                                  icon: Ionicons.school_outline,
+                                  label: 'Program',
+                                  value: _program,
+                                ),
+                                const SizedBox(height: 12),
+                                _buildAccountActionButton(
+                                  icon: Ionicons.document_outline,
+                                  title: 'View Activity Card',
+                                  subtitle: 'See your student activity details',
+                                  onTap: () {
+                                    Navigator.pushNamed(
+                                      context,
+                                      AppRouter.activityCard,
                                     );
                                   },
                                 ),
-                              ),
+                              ],
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 52),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: _buildProfileSummaryCard(),
-                  ),
-                  const SizedBox(height: 22),
-                  _buildSectionHeader(
-                    title: 'Academic Details',
-                    subtitle: 'Your student profile information',
-                  ),
-                  const SizedBox(height: 12),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      children: [
-                        _buildInfoCard(
-                          icon: Ionicons.card_outline,
-                          label: 'Student ID',
-                          value: _studentId,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildInfoCard(
-                          icon: Ionicons.people,
-                          label: 'Faculty',
-                          value: _faculty,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildInfoCard(
-                          icon: Ionicons.school_outline,
-                          label: 'Program',
-                          value: _program,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildAccountActionButton(
-                          icon: Ionicons.document_outline,
-                          title: 'View Activity Card',
-                          subtitle: 'See your student activity details',
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Navigating to Activity Card'),
-                                duration: Duration(seconds: 1),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                  _buildSectionHeader(
-                    title: 'Account',
-                    subtitle: 'Manage your login and security settings',
-                  ),
-                  const SizedBox(height: 12),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      children: [
-                        _buildAccountActionButton(
-                          icon: Ionicons.mail_outline,
-                          title: 'Change Email',
-                          subtitle: 'Update your account email address',
-                          onTap: () {
-                            Navigator.pushNamed(context, AppRouter.changeEmail);
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        _buildAccountActionButton(
-                          icon: Ionicons.lock_closed_outline,
-                          title: 'Change Password',
-                          subtitle: 'Secure your account with a new password',
-                          onTap: () {
-                            Navigator.pushNamed(
-                              context,
-                              AppRouter.changePassword,
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        _buildAccountActionButton(
-                          icon: Ionicons.server_outline,
-                          title: 'View Local Students DB',
-                          subtitle: 'See saved student records on this device',
-                          onTap: () {
-                            Navigator.pushNamed(
-                              context,
-                              AppRouter.studentsDatabase,
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        _buildAccountActionButton(
-                          icon: Ionicons.log_out_outline,
-                          title: 'Logout',
-                          subtitle: 'Sign out from this device',
-                          onTap: _handleLogout,
-                          isDestructive: true,
-                        ),
-                        const SizedBox(height: 34),
-                      ],
+                          const SizedBox(height: 22),
+                          _buildSectionHeader(
+                            title: 'Account',
+                            subtitle: 'Manage your login and security settings',
+                          ),
+                          const SizedBox(height: 12),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: Column(
+                              children: [
+                                _buildAccountActionButton(
+                                  icon: Ionicons.mail_outline,
+                                  title: 'Change Email',
+                                  subtitle: 'Update your account email address',
+                                  onTap: () {
+                                    Navigator.pushNamed(
+                                      context,
+                                      AppRouter.changeEmail,
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                                _buildAccountActionButton(
+                                  icon: Ionicons.lock_closed_outline,
+                                  title: 'Change Password',
+                                  subtitle:
+                                      'Secure your account with a new password',
+                                  onTap: () {
+                                    Navigator.pushNamed(
+                                      context,
+                                      AppRouter.changePassword,
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                                _buildAccountActionButton(
+                                  icon: Ionicons.log_out_outline,
+                                  title: 'Logout',
+                                  subtitle: 'Sign out from this device',
+                                  onTap: _handleLogout,
+                                  isDestructive: true,
+                                ),
+                                const SizedBox(height: 34),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
-              ),
-            ),
-            Positioned(
-              bottom: 200,
-              right: -30,
-              child: Opacity(
-                opacity: 0.1,
-                child: Container(
-                  width: 200,
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF003DA5),
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: 0,
-              left: 0,
-              child: Opacity(
-                opacity: 0.15,
-                child: Container(
-                  width: 150,
-                  height: 150,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFC107),
-                    borderRadius: const BorderRadius.only(
-                      topRight: Radius.circular(150),
-                    ),
-                  ),
-                ),
               ),
             ),
           ],
@@ -380,6 +368,92 @@ class _ProfileScreenState extends State<ProfileScreen> {
           currentIndex: _selectedIndex,
           onTap: _onNavItemTapped,
         ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      color: Colors.white,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Image.asset(
+                'assets/logos/vouch_logo.png',
+                height: 40,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(width: 2),
+              Transform.translate(
+                offset: const Offset(-2, 0),
+                child: RichText(
+                  text: TextSpan(
+                    style: GoogleFonts.poppins(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    children: const [
+                      TextSpan(
+                        text: 'ou',
+                        style: TextStyle(color: Color(0xFF003DA5)),
+                      ),
+                      TextSpan(
+                        text: 'ch',
+                        style: TextStyle(color: Color(0xFFFFC107)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Ionicons.search, color: Color(0xFF003DA5)),
+                onPressed: () {},
+              ),
+              IconButton(
+                icon: const Icon(
+                  Ionicons.notifications,
+                  color: Color(0xFF003DA5),
+                ),
+                onPressed: () {},
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(19),
+                  child: Image.asset(
+                    widget.avatarPath,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: const Color(0xFFE8F0F8),
+                        child: const Center(
+                          child: Icon(
+                            Ionicons.person,
+                            size: 20,
+                            color: Color(0xFF003DA5),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -403,15 +477,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            _userName,
-            style: const TextStyle(
-              color: Color(0xFF003DA5),
-              fontSize: 21,
-              fontWeight: FontWeight.w700,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Image.asset(
+                    widget.avatarPath,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: const Color(0xFFE8F0F8),
+                        child: const Icon(
+                          Ionicons.person,
+                          size: 22,
+                          color: Color(0xFF003DA5),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _userName,
+                  style: const TextStyle(
+                    color: Color(0xFF003DA5),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
           Text(
             _userEmail,
             style: const TextStyle(color: Colors.black54, fontSize: 13),
@@ -539,6 +645,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required VoidCallback onTap,
     bool isDestructive = false,
   }) {
+    final isLogoutLoading = isDestructive && _isLoggingOut;
     final iconColor = isDestructive
         ? const Color(0xFFB3261E)
         : const Color(0xFF003DA5);
@@ -550,7 +657,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       color: Colors.white,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        onTap: onTap,
+        onTap: isLogoutLoading ? null : onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -610,6 +717,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Ionicons.chevron_forward,
                 color: iconColor.withOpacity(0.55),
               ),
+              const SizedBox(width: 6),
+              if (isLogoutLoading)
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color(0xFFB3261E),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
