@@ -73,6 +73,17 @@ class SupabaseAuthService {
     );
   }
 
+  static Future<void> sendPasswordRecoveryOtp({required String email}) {
+    return _auth.resetPasswordForEmail(email, redirectTo: null);
+  }
+
+  static Future<AuthResponse> verifyPasswordRecoveryOtp({
+    required String email,
+    required String code,
+  }) {
+    return _auth.verifyOTP(email: email, token: code, type: OtpType.recovery);
+  }
+
   static Future<UserResponse> requestEmailChange({required String newEmail}) {
     return _auth.updateUser(UserAttributes(email: newEmail));
   }

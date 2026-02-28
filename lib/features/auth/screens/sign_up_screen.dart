@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../routes/app_router.dart';
+import '../services/password_policy.dart';
 import '../services/supabase_auth_service.dart';
 
 class SignUpScreen extends StatefulWidget {
@@ -35,35 +36,53 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   // Sample data
   final List<String> faculties = [
-    'Faculty of Computing, Engineering, and Technology',
-    'Faculty of Agriculture and Life Sciences',
-    'Faculty of Business and Management',
-    'Faculty of Teachers Education',
-    'Faculty of Nursing and Health Sciences',
-    'Faculty of Criminal Justice Education',
+    'Faculty of Nursing and Allied Health Sciences (FNAHS)',
+    'Faculty of Agriculture and Life Sciences (FALS)',
+    'Faculty of Business and Management (FBM)',
+    'Faculty of Computing, Engineering and Technology (FaCET)',
+    'Faculty of Teacher Education (FTED)',
+    'Faculty of Humanities, Social Sciences, and Communication (FHuSoCom)',
+    'Faculty of Criminal Justice Education (FCJE)',
   ];
   final Map<String, List<String>> facultyPrograms = {
-    'Faculty of Computing, Engineering, and Technology': [
-      'Bachelor of Science in Information Technology',
-      'Bachelor of Science in Civil Engineering',
-      'Bachelor of Science in Mathematics',
-      'Bachelor of Science in Industrial Technology Management',
-    ],
-    'Faculty of Agriculture and Life Sciences': [
-      ' Bachelor of Science in Biology',
-      'Bachelor of Science in Agriculture',
-      'Bachelor of Science in Applied Mathematics',
-    ],
-    'Faculty of Business and Management': [
-      'Bachelor of Science in Hospitality Management',
-      'Bachelor of Science in Business Administration',
-    ],
-    'Faculty of Teachers Education': [],
-    'Faculty of Nursing and Health Sciences': [
+    'Faculty of Nursing and Allied Health Sciences (FNAHS)': [
       'Bachelor of Science in Nursing',
     ],
-    'Faculty of Criminal Justice Education': [
+    'Faculty of Agriculture and Life Sciences (FALS)': [
+      'Bachelor of Science in Agribusiness Management',
+      'Bachelor of Agricultural Technology',
+      'Bachelor of Science in Biology',
+      'Bachelor of Science in Environmental Science',
+    ],
+    'Faculty of Business and Management (FBM)': [
+      'Bachelor of Science in Business Administration',
       'Bachelor of Science in Criminology',
+      'Bachelor of Science in Hospitality Management',
+    ],
+    'Faculty of Computing, Engineering and Technology (FaCET)': [
+      'Bachelor of Science in Civil Engineering',
+      'Bachelor of Industrial Technology Management',
+      'Bachelor of Science in Information Technology',
+      'Bachelor of Science in Mathematics with Research Statistics',
+    ],
+    'Faculty of Teacher Education (FTED)': [
+      'Bachelor of Elementary Education',
+      'Bachelor of Early Childhood Education',
+      'Bachelor of Secondary Education major in Biological Sciences',
+      'Bachelor of Secondary Education major in English',
+      'Bachelor of Secondary Education major in Filipino',
+      'Bachelor of Secondary Education major in Mathematics',
+      'Bachelor of Secondary Education major in Science',
+      'Bachelor of Physical Education major in School Physical Education',
+      'Bachelor of Special Needs Education',
+    ],
+    'Faculty of Criminal Justice Education (FCJE)': [
+      'Bachelor of Science in Criminology',
+    ],
+    'Faculty of Humanities, Social Sciences, and Communication (FHuSoCom)': [
+      'Bachelor of Development Communication',
+      'Bachelor of Arts in Political Science',
+      'Bachelor of Science in Psychology',
     ],
   };
 
@@ -329,6 +348,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
     if (!isSchoolIdValid) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('School ID must be in XXXX-XXXX format.')),
+      );
+      return;
+    }
+
+    if (!PasswordPolicy.isValid(password)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(PasswordPolicy.requirementMessage)),
       );
       return;
     }

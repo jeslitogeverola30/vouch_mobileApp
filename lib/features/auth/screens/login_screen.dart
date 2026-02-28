@@ -202,7 +202,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                   const SizedBox(height: 10),
                                   TextButton(
-                                    onPressed: () {},
+                                    onPressed: () {
+                                      Navigator.of(context).pushNamed(
+                                        AppRouter.forgotPassword,
+                                        arguments: _emailController.text.trim(),
+                                      );
+                                    },
                                     style: TextButton.styleFrom(
                                       foregroundColor: const Color(0xFF003DA5),
                                     ),

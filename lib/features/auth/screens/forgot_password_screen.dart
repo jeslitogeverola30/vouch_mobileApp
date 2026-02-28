@@ -1,70 +1,117 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../auth/services/password_policy.dart';
-import '../../auth/services/supabase_auth_service.dart';
+import '../../profile/services/supabase_profile_service.dart';
+import '../../../routes/app_router.dart';
+import '../services/password_policy.dart';
+import '../services/supabase_auth_service.dart';
 
-class ChangePasswordScreen extends StatefulWidget {
-  const ChangePasswordScreen({super.key});
+class ForgotPasswordScreen extends StatefulWidget {
+  final String initialEmail;
+
+  const ForgotPasswordScreen({super.key, this.initialEmail = ''});
 
   @override
-  State<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
-  late final TextEditingController _currentPasswordController;
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  late final TextEditingController _emailController;
+  late final TextEditingController _codeController;
   late final TextEditingController _newPasswordController;
   late final TextEditingController _confirmPasswordController;
 
+  bool _isSendingCode = false;
   bool _isSubmitting = false;
-  bool _obscureCurrentPassword = true;
-  bool _obscureNewPassword = true;
-  bool _obscureConfirmPassword = true;
-
-  String _currentEmail = '';
+  bool _showNewPassword = false;
+  bool _showConfirmPassword = false;
+  bool _codeSent = false;
 
   @override
   void initState() {
     super.initState();
-    _currentPasswordController = TextEditingController();
+    _emailController = TextEditingController(text: widget.initialEmail.trim());
+    _codeController = TextEditingController();
     _newPasswordController = TextEditingController();
     _confirmPasswordController = TextEditingController();
-    _currentEmail = SupabaseAuthService.currentUser?.email ?? '';
   }
 
   @override
   void dispose() {
-    _currentPasswordController.dispose();
+    _emailController.dispose();
+    _codeController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _changePassword() async {
-    final currentPassword = _currentPasswordController.text;
-    final newPassword = _newPasswordController.text;
-    final confirmPassword = _confirmPasswordController.text;
-
-    if (_currentEmail.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('No signed-in user found.')));
+  Future<void> _sendCode() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your email first.')),
+      );
       return;
     }
 
-    if (currentPassword.isEmpty ||
+    setState(() => _isSendingCode = true);
+
+    try {
+      await SupabaseAuthService.sendPasswordRecoveryOtp(email: email);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() => _isSendingCode = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isSendingCode = false;
+      _codeSent = true;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Recovery code sent to your email.')),
+    );
+  }
+
+  Future<void> _resetPassword() async {
+    final email = _emailController.text.trim();
+    final code = _codeController.text.trim();
+    final newPassword = _newPasswordController.text;
+    final confirmPassword = _confirmPasswordController.text;
+
+    if (email.isEmpty ||
+        code.isEmpty ||
         newPassword.isEmpty ||
         confirmPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('All password fields are required.')),
+        const SnackBar(content: Text('Please fill in all fields.')),
+      );
+      return;
+    }
+
+    if (!RegExp(r'^\d{8}$').hasMatch(code)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter the 8-digit verification code.')),
       );
       return;
     }
 
     if (newPassword != confirmPassword) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('New passwords do not match.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Passwords do not match.')));
       return;
     }
 
@@ -75,25 +122,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       return;
     }
 
-    if (currentPassword == newPassword) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'New password must be different from current password.',
-          ),
-        ),
-      );
-      return;
-    }
-
     setState(() => _isSubmitting = true);
 
     try {
-      await SupabaseAuthService.signInWithPassword(
-        email: _currentEmail,
-        password: currentPassword,
+      await SupabaseAuthService.verifyPasswordRecoveryOtp(
+        email: email,
+        code: code,
       );
-
       await SupabaseAuthService.updatePassword(newPassword: newPassword);
     } catch (error) {
       if (!mounted) {
@@ -111,56 +146,19 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       return;
     }
 
+    try {
+      await SupabaseProfileService.ensureCurrentUserProfile();
+    } catch (_) {}
+
     setState(() => _isSubmitting = false);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Password updated successfully.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Password reset successful.')));
 
-    Navigator.of(context).pop();
-  }
-
-  InputDecoration _passwordInputDecoration({
-    required String hintText,
-    required bool obscure,
-    required VoidCallback onToggle,
-  }) {
-    return InputDecoration(
-      hintText: hintText,
-      hintStyle: GoogleFonts.poppins(
-        color: Colors.grey.shade500,
-        fontSize: 13,
-        fontWeight: FontWeight.w500,
-      ),
-      filled: true,
-      fillColor: Colors.white,
-      suffixIcon: IconButton(
-        onPressed: onToggle,
-        icon: Icon(
-          obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-          color: const Color(0xFF003DA5),
-          size: 20,
-        ),
-      ),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(
-          color: const Color(0xFF003DA5).withOpacity(0.15),
-          width: 1.5,
-        ),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(
-          color: const Color(0xFF003DA5).withOpacity(0.15),
-          width: 1.5,
-        ),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFF003DA5), width: 2),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).pushNamedAndRemoveUntil(AppRouter.studentHome, (route) => false);
   }
 
   @override
@@ -301,7 +299,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                     ),
                                     const SizedBox(height: 16),
                                     Text(
-                                      'Change password',
+                                      'Forgot password',
                                       style: GoogleFonts.poppins(
                                         fontSize: 20,
                                         fontWeight: FontWeight.w700,
@@ -310,7 +308,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                     ),
                                     const SizedBox(height: 6),
                                     Text(
-                                      'Re-enter your current password to confirm this sensitive change.',
+                                      'Get an 8-digit code and set your new password',
                                       style: GoogleFonts.poppins(
                                         fontSize: 13,
                                         color: Colors.black54,
@@ -318,85 +316,92 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                       ),
                                       textAlign: TextAlign.center,
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      _currentEmail.isEmpty
-                                          ? 'Current account unavailable'
-                                          : _currentEmail,
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 13,
-                                        color: const Color(0xFF003DA5),
-                                        fontWeight: FontWeight.w600,
+                                    const SizedBox(height: 20),
+                                    _buildInputField(
+                                      controller: _emailController,
+                                      hintText: 'Enter your email',
+                                      icon: Icons.mail_outline,
+                                      keyboardType: TextInputType.emailAddress,
+                                      textInputAction: TextInputAction.next,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      height: 48,
+                                      child: OutlinedButton(
+                                        onPressed: _isSendingCode
+                                            ? null
+                                            : _sendCode,
+                                        style: OutlinedButton.styleFrom(
+                                          side: BorderSide(
+                                            color: const Color(
+                                              0xFF003DA5,
+                                            ).withOpacity(0.35),
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                          ),
+                                        ),
+                                        child: _isSendingCode
+                                            ? const SizedBox(
+                                                width: 18,
+                                                height: 18,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                    ),
+                                              )
+                                            : Text(
+                                                _codeSent
+                                                    ? 'Resend Code'
+                                                    : 'Send Code',
+                                                style: GoogleFonts.poppins(
+                                                  color: const Color(
+                                                    0xFF003DA5,
+                                                  ),
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
                                       ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    _buildInputField(
+                                      controller: _codeController,
+                                      hintText: '8-digit code',
+                                      icon: Icons.verified_outlined,
+                                      keyboardType: TextInputType.number,
+                                      maxLength: 8,
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                      ],
+                                      textInputAction: TextInputAction.next,
                                       textAlign: TextAlign.center,
                                     ),
-                                    const SizedBox(height: 20),
-                                    TextField(
-                                      controller: _currentPasswordController,
-                                      obscureText: _obscureCurrentPassword,
-                                      textInputAction: TextInputAction.next,
-                                      decoration: _passwordInputDecoration(
-                                        hintText: 'Current password',
-                                        obscure: _obscureCurrentPassword,
-                                        onToggle: () {
-                                          setState(() {
-                                            _obscureCurrentPassword =
-                                                !_obscureCurrentPassword;
-                                          });
-                                        },
-                                      ),
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
                                     const SizedBox(height: 12),
-                                    TextField(
+                                    _buildPasswordField(
                                       controller: _newPasswordController,
-                                      obscureText: _obscureNewPassword,
-                                      textInputAction: TextInputAction.next,
-                                      decoration: _passwordInputDecoration(
-                                        hintText: 'New password',
-                                        obscure: _obscureNewPassword,
-                                        onToggle: () {
-                                          setState(() {
-                                            _obscureNewPassword =
-                                                !_obscureNewPassword;
-                                          });
-                                        },
-                                      ),
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                        color: Colors.black87,
-                                      ),
+                                      hintText: 'New password',
+                                      isVisible: _showNewPassword,
+                                      onToggle: () {
+                                        setState(
+                                          () => _showNewPassword =
+                                              !_showNewPassword,
+                                        );
+                                      },
                                     ),
                                     const SizedBox(height: 12),
-                                    TextField(
+                                    _buildPasswordField(
                                       controller: _confirmPasswordController,
-                                      obscureText: _obscureConfirmPassword,
-                                      textInputAction: TextInputAction.done,
-                                      onSubmitted: (_) {
-                                        if (!_isSubmitting) {
-                                          _changePassword();
-                                        }
+                                      hintText: 'Retype new password',
+                                      isVisible: _showConfirmPassword,
+                                      onToggle: () {
+                                        setState(
+                                          () => _showConfirmPassword =
+                                              !_showConfirmPassword,
+                                        );
                                       },
-                                      decoration: _passwordInputDecoration(
-                                        hintText: 'Confirm new password',
-                                        obscure: _obscureConfirmPassword,
-                                        onToggle: () {
-                                          setState(() {
-                                            _obscureConfirmPassword =
-                                                !_obscureConfirmPassword;
-                                          });
-                                        },
-                                      ),
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                        color: Colors.black87,
-                                      ),
                                     ),
                                     const SizedBox(height: 20),
                                     SizedBox(
@@ -405,7 +410,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                       child: ElevatedButton(
                                         onPressed: _isSubmitting
                                             ? null
-                                            : _changePassword,
+                                            : _resetPassword,
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: const Color(
                                             0xFFFFC107,
@@ -416,12 +421,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                           disabledBackgroundColor: const Color(
                                             0xFFFFC107,
                                           ).withOpacity(0.6),
+                                          elevation: 0,
                                           shape: RoundedRectangleBorder(
                                             borderRadius: BorderRadius.circular(
                                               14,
                                             ),
                                           ),
-                                          elevation: 0,
                                         ),
                                         child: _isSubmitting
                                             ? const SizedBox(
@@ -436,7 +441,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                                 ),
                                               )
                                             : Text(
-                                                'Reauthenticate & Update',
+                                                'Reset Password',
                                                 style: GoogleFonts.poppins(
                                                   fontSize: 16,
                                                   fontWeight: FontWeight.w700,
@@ -459,6 +464,109 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String hintText,
+    required IconData icon,
+    TextInputType keyboardType = TextInputType.text,
+    TextInputAction? textInputAction,
+    List<TextInputFormatter>? inputFormatters,
+    int? maxLength,
+    TextAlign textAlign = TextAlign.start,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      maxLength: maxLength,
+      textInputAction: textInputAction,
+      textAlign: textAlign,
+      decoration: _buildInputDecoration(
+        hintText: hintText,
+        icon: icon,
+      ).copyWith(counterText: ''),
+      style: GoogleFonts.poppins(
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: Colors.black87,
+      ),
+    );
+  }
+
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String hintText,
+    required bool isVisible,
+    required VoidCallback onToggle,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: !isVisible,
+      decoration:
+          _buildInputDecoration(
+            hintText: hintText,
+            icon: Icons.lock_outline,
+          ).copyWith(
+            suffixIcon: IconButton(
+              onPressed: onToggle,
+              icon: Icon(
+                isVisible ? Icons.visibility : Icons.visibility_off,
+                color: Colors.grey.shade600,
+                size: 20,
+              ),
+            ),
+          ),
+      style: GoogleFonts.poppins(
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: Colors.black87,
+      ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration({
+    required String hintText,
+    required IconData icon,
+  }) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(
+        color: const Color(0xFF003DA5).withOpacity(0.15),
+        width: 1.5,
+      ),
+    );
+
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: GoogleFonts.poppins(
+        fontSize: 13,
+        color: Colors.grey.shade500,
+        fontWeight: FontWeight.w500,
+      ),
+      border: border,
+      enabledBorder: border,
+      focusedBorder: border.copyWith(
+        borderSide: const BorderSide(color: Color(0xFF003DA5), width: 2),
+      ),
+      prefixIcon: Padding(
+        padding: const EdgeInsets.only(left: 10, right: 8),
+        child: Center(
+          widthFactor: 1,
+          child: Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFC107).withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: const Color(0xFF003DA5), size: 18),
+          ),
+        ),
+      ),
+      contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 12),
     );
   }
 }
