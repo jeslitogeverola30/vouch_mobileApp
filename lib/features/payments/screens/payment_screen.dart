@@ -21,7 +21,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
 
   final String studentId = '2023-0222';
   final String academicYear = 'A.Y. 2025-2026';
-  final double totalPayable = 200.00;
+  final double totalPayable = 99999.00;
 
   final List<Map<String, dynamic>> paymentItems = [
     {
@@ -59,6 +59,9 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     }
     if (selectedTab == 'To Pay') {
       return paymentItems.where((item) => item['status'] == 'To Pay').toList();
+    }
+    if (selectedTab == 'Paid') {
+      return paymentItems.where((item) => item['status'] == 'Paid').toList();
     }
     return paymentItems;
   }
@@ -201,7 +204,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                                 '₱ ${totalPayable.toStringAsFixed(2)}',
                                 style: GoogleFonts.poppins(
                                   color: Colors.white,
-                                  fontSize: 56,
+                                  fontSize: 40,
                                   height: 0.95,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -263,7 +266,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
   }
 
   Widget _buildTabs() {
-    const tabs = ['All', 'Pending', 'To Pay'];
+    const tabs = ['All', 'Pending', 'To Pay', 'Paid'];
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -361,10 +364,10 @@ class _SummaryYellowPanelClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
     final path = Path();
-    path.moveTo(size.width * 0.79, 0);
+    path.moveTo(size.width * 0.77, 0);
     path.lineTo(size.width, 0);
     path.lineTo(size.width, size.height);
-    path.lineTo(size.width * 0.63, size.height);
+    path.lineTo(size.width * 0.50, size.height);
     path.close();
     return path;
   }
