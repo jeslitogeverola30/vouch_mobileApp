@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
 
+import '../../../core/data/local/database_helper.dart';
+import '../../auth/services/supabase_auth_service.dart';
+import '../services/supabase_profile_service.dart';
+
 const Color royalBlue = Color(0xFF003DA5);
 const Color gold = Color(0xFFFFC107);
 
@@ -13,6 +17,10 @@ class ActivityCardScreen extends StatefulWidget {
 }
 
 class _ActivityCardScreenState extends State<ActivityCardScreen> {
+  String _studentName = 'Jeslito G. Geverola';
+  String _studentProgram = 'BS - Information Technology';
+  String _studentId = '2023-0222';
+
   static const _rowOneActivities = [
     //7 max items
     ('General Cleaning', false),
@@ -36,6 +44,40 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
     ('Skills Training', false),
     ('Skills Training', false),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadStudentProfile();
+    });
+  }
+
+  Future<void> _loadStudentProfile() async {
+    final email = SupabaseAuthService.currentUser?.email;
+
+    Map<String, dynamic>? student;
+    try {
+      student = await SupabaseProfileService.getCurrentUserProfile();
+    } catch (_) {
+      student = null;
+    }
+
+    if (student == null && email != null && email.isNotEmpty) {
+      student = await DatabaseHelper.instance.getStudentByEmail(email);
+    }
+
+    if (student == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _studentName = (student!['full_name'] as String? ?? _studentName).trim();
+      _studentProgram = (student['program'] as String? ?? _studentProgram)
+          .trim();
+      _studentId = (student['student_id'] as String? ?? _studentId).trim();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -240,40 +282,40 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
                       ),
                     ),
                     const SizedBox(width: 15),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            'Jeslito G. Geverola Gwapo Joshua Luciano Arguete',
+                            _studentName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: royalBlue,
                               fontSize: 26,
                               height: 1.05,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                          SizedBox(height: 12),
+                          const SizedBox(height: 12),
                           Text(
-                            'BS Physial Education major in School Physical Education',
+                            _studentProgram,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: Color(0xFF1F2C40),
                               fontSize: 20,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          SizedBox(height: 6),
+                          const SizedBox(height: 6),
                           Text(
-                            '2023-0222',
+                            _studentId,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: Color(0xFF1F2C40),
                               fontSize: 20,
                               fontWeight: FontWeight.w600,
