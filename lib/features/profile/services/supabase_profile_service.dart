@@ -61,6 +61,27 @@ class SupabaseProfileService {
     return List<Map<String, dynamic>>.from(response);
   }
 
+  static Future<void> syncCurrentUserEmail({
+    required String previousEmail,
+  }) async {
+    final user = SupabaseAuthService.currentUser;
+    final nextEmail = user?.email;
+
+    if (nextEmail == null ||
+        nextEmail.isEmpty ||
+        previousEmail.isEmpty ||
+        previousEmail == nextEmail) {
+      return;
+    }
+
+    await _client
+        .from(_table)
+        .update({'email': nextEmail})
+        .eq('email', previousEmail);
+
+    await ensureCurrentUserProfile();
+  }
+
   static String? _resolveFullName(Map<String, dynamic> metadata) {
     final explicit = _readString(metadata['full_name']);
     if (explicit != null && explicit.isNotEmpty) {

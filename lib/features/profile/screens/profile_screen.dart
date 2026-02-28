@@ -326,7 +326,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   onTap: () {
                                     Navigator.pushNamed(
                                       context,
-                                      AppRouter.changeEmail,
+                                      AppRouter.sensitiveReauth,
+                                      arguments: AppRouter.changeEmail,
                                     );
                                   },
                                 ),
@@ -339,7 +340,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   onTap: () {
                                     Navigator.pushNamed(
                                       context,
-                                      AppRouter.changePassword,
+                                      AppRouter.sensitiveReauth,
+                                      arguments: AppRouter.changePassword,
                                     );
                                   },
                                 ),

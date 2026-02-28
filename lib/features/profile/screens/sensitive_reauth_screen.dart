@@ -1,79 +1,66 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../auth/services/supabase_auth_service.dart';
-import '../services/supabase_profile_service.dart';
 
-class ChangeEmailScreen extends StatefulWidget {
-  const ChangeEmailScreen({super.key});
+class SensitiveReauthScreen extends StatefulWidget {
+  const SensitiveReauthScreen({super.key, required this.nextRoute});
+
+  final String nextRoute;
 
   @override
-  State<ChangeEmailScreen> createState() => _ChangeEmailScreenState();
+  State<SensitiveReauthScreen> createState() => _SensitiveReauthScreenState();
 }
 
-class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
-  late final TextEditingController _emailController;
-  late final TextEditingController _codeController;
-
-  bool _isSending = false;
-  bool _isVerifying = false;
-  bool _isResending = false;
-  bool _hasRequestedCode = false;
-
+class _SensitiveReauthScreenState extends State<SensitiveReauthScreen> {
+  late final TextEditingController _passwordController;
+  bool _isSubmitting = false;
+  bool _obscurePassword = true;
   String _currentEmail = '';
-  String _requestedEmail = '';
 
   @override
   void initState() {
     super.initState();
+    _passwordController = TextEditingController();
     _currentEmail = SupabaseAuthService.currentUser?.email ?? '';
-    _emailController = TextEditingController(text: _currentEmail);
-    _codeController = TextEditingController();
   }
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _codeController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
-  bool _isValidEmail(String value) {
-    return RegExp(
-      r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$',
-    ).hasMatch(value);
-  }
+  Future<void> _continueAfterReauth() async {
+    final currentPassword = _passwordController.text;
 
-  Future<void> _sendCode() async {
-    final nextEmail = _emailController.text.trim().toLowerCase();
+    if (_currentEmail.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No signed-in user found.')));
+      return;
+    }
 
-    if (!_isValidEmail(nextEmail)) {
+    if (currentPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid email address.')),
+        const SnackBar(content: Text('Enter your current password.')),
       );
       return;
     }
 
-    if (_currentEmail.isNotEmpty && nextEmail == _currentEmail.toLowerCase()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Use a different email from your current one.'),
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isSending = true);
+    setState(() => _isSubmitting = true);
 
     try {
-      await SupabaseAuthService.requestEmailChange(newEmail: nextEmail);
+      await SupabaseAuthService.signInWithPassword(
+        email: _currentEmail,
+        password: currentPassword,
+      );
     } catch (error) {
       if (!mounted) {
         return;
       }
 
-      setState(() => _isSending = false);
+      setState(() => _isSubmitting = false);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(error.toString())));
@@ -84,111 +71,9 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
       return;
     }
 
-    setState(() {
-      _isSending = false;
-      _hasRequestedCode = true;
-      _requestedEmail = nextEmail;
-      _codeController.clear();
-    });
+    setState(() => _isSubmitting = false);
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Verification code sent.')));
-  }
-
-  Future<void> _verifyCode() async {
-    final code = _codeController.text.trim();
-    if (!_hasRequestedCode) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Send a verification code first.')),
-      );
-      return;
-    }
-
-    if (!RegExp(r'^\d{8}$').hasMatch(code)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter the 8-digit verification code.')),
-      );
-      return;
-    }
-
-    setState(() => _isVerifying = true);
-
-    final previousEmail = _currentEmail;
-
-    try {
-      await SupabaseAuthService.verifyEmailChangeOtp(
-        email: _requestedEmail,
-        code: code,
-      );
-      await SupabaseProfileService.syncCurrentUserEmail(
-        previousEmail: previousEmail,
-      );
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() => _isVerifying = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
-      return;
-    }
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _isVerifying = false;
-      _currentEmail = SupabaseAuthService.currentUser?.email ?? _requestedEmail;
-      _hasRequestedCode = false;
-      _requestedEmail = '';
-      _emailController.text = _currentEmail;
-      _codeController.clear();
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Email updated successfully.')),
-    );
-
-    Navigator.of(context).pop();
-  }
-
-  Future<void> _resendCode() async {
-    if (!_hasRequestedCode || _requestedEmail.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Send a verification code first.')),
-      );
-      return;
-    }
-
-    setState(() => _isResending = true);
-
-    try {
-      await SupabaseAuthService.resendEmailChangeOtp(email: _requestedEmail);
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() => _isResending = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
-      return;
-    }
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() => _isResending = false);
-
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Verification code resent.')));
+    Navigator.of(context).pushReplacementNamed(widget.nextRoute);
   }
 
   @override
@@ -329,7 +214,7 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
                                     ),
                                     const SizedBox(height: 16),
                                     Text(
-                                      'Change email',
+                                      'Reauthenticate',
                                       style: GoogleFonts.poppins(
                                         fontSize: 20,
                                         fontWeight: FontWeight.w700,
@@ -338,7 +223,7 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
                                     ),
                                     const SizedBox(height: 6),
                                     Text(
-                                      'Enter your new email to receive an 8-digit code.',
+                                      'For sensitive changes, confirm your current password first.',
                                       style: GoogleFonts.poppins(
                                         fontSize: 13,
                                         color: Colors.black54,
@@ -349,8 +234,8 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
                                     const SizedBox(height: 4),
                                     Text(
                                       _currentEmail.isEmpty
-                                          ? 'Current email unavailable'
-                                          : 'Current: $_currentEmail',
+                                          ? 'Current account unavailable'
+                                          : _currentEmail,
                                       style: GoogleFonts.poppins(
                                         fontSize: 13,
                                         color: const Color(0xFF003DA5),
@@ -360,11 +245,16 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
                                     ),
                                     const SizedBox(height: 20),
                                     TextField(
-                                      controller: _emailController,
-                                      keyboardType: TextInputType.emailAddress,
-                                      textInputAction: TextInputAction.next,
+                                      controller: _passwordController,
+                                      obscureText: _obscurePassword,
+                                      textInputAction: TextInputAction.done,
+                                      onSubmitted: (_) {
+                                        if (!_isSubmitting) {
+                                          _continueAfterReauth();
+                                        }
+                                      },
                                       decoration: InputDecoration(
-                                        hintText: 'New email address',
+                                        hintText: 'Current password',
                                         hintStyle: GoogleFonts.poppins(
                                           color: Colors.grey.shade500,
                                           fontSize: 13,
@@ -372,6 +262,21 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
                                         ),
                                         filled: true,
                                         fillColor: Colors.white,
+                                        suffixIcon: IconButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              _obscurePassword =
+                                                  !_obscurePassword;
+                                            });
+                                          },
+                                          icon: Icon(
+                                            _obscurePassword
+                                                ? Icons.visibility_off_outlined
+                                                : Icons.visibility_outlined,
+                                            color: const Color(0xFF003DA5),
+                                            size: 20,
+                                          ),
+                                        ),
                                         border: OutlineInputBorder(
                                           borderRadius: BorderRadius.circular(
                                             14,
@@ -410,119 +315,14 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
                                         color: Colors.black87,
                                       ),
                                     ),
-                                    const SizedBox(height: 14),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      height: 48,
-                                      child: OutlinedButton(
-                                        onPressed: _isSending
-                                            ? null
-                                            : _sendCode,
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: const Color(
-                                            0xFF003DA5,
-                                          ),
-                                          side: BorderSide(
-                                            color: const Color(
-                                              0xFF003DA5,
-                                            ).withOpacity(0.25),
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
-                                          ),
-                                        ),
-                                        child: _isSending
-                                            ? const SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                    ),
-                                              )
-                                            : Text(
-                                                'Send code',
-                                                style: GoogleFonts.poppins(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    TextField(
-                                      controller: _codeController,
-                                      keyboardType: TextInputType.number,
-                                      inputFormatters: [
-                                        FilteringTextInputFormatter.digitsOnly,
-                                      ],
-                                      textInputAction: TextInputAction.done,
-                                      maxLength: 8,
-                                      textAlign: TextAlign.center,
-                                      onSubmitted: (_) {
-                                        if (!_isVerifying) {
-                                          _verifyCode();
-                                        }
-                                      },
-                                      decoration: InputDecoration(
-                                        hintText: '8-digit code',
-                                        counterText: '',
-                                        hintStyle: GoogleFonts.poppins(
-                                          color: Colors.grey.shade500,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                        filled: true,
-                                        fillColor: Colors.white,
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            14,
-                                          ),
-                                          borderSide: BorderSide(
-                                            color: const Color(
-                                              0xFF003DA5,
-                                            ).withOpacity(0.15),
-                                            width: 1.5,
-                                          ),
-                                        ),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            14,
-                                          ),
-                                          borderSide: BorderSide(
-                                            color: const Color(
-                                              0xFF003DA5,
-                                            ).withOpacity(0.15),
-                                            width: 1.5,
-                                          ),
-                                        ),
-                                        focusedBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            14,
-                                          ),
-                                          borderSide: const BorderSide(
-                                            color: Color(0xFF003DA5),
-                                            width: 2,
-                                          ),
-                                        ),
-                                      ),
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 18,
-                                        letterSpacing: 6,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
                                     const SizedBox(height: 20),
                                     SizedBox(
                                       width: double.infinity,
                                       height: 52,
                                       child: ElevatedButton(
-                                        onPressed: _isVerifying
+                                        onPressed: _isSubmitting
                                             ? null
-                                            : _verifyCode,
+                                            : _continueAfterReauth,
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: const Color(
                                             0xFFFFC107,
@@ -540,7 +340,7 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
                                           ),
                                           elevation: 0,
                                         ),
-                                        child: _isVerifying
+                                        child: _isSubmitting
                                             ? const SizedBox(
                                                 width: 20,
                                                 height: 20,
@@ -553,39 +353,13 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
                                                 ),
                                               )
                                             : Text(
-                                                'Verify and Update',
+                                                'Continue',
                                                 style: GoogleFonts.poppins(
                                                   fontSize: 16,
                                                   fontWeight: FontWeight.w700,
                                                 ),
                                               ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    TextButton(
-                                      onPressed: _isResending
-                                          ? null
-                                          : _resendCode,
-                                      style: TextButton.styleFrom(
-                                        foregroundColor: const Color(
-                                          0xFF003DA5,
-                                        ),
-                                      ),
-                                      child: _isResending
-                                          ? const SizedBox(
-                                              width: 18,
-                                              height: 18,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : Text(
-                                              'Resend code',
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
                                     ),
                                   ],
                                 ),
