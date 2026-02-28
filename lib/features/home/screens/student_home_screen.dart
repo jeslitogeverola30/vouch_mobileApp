@@ -6,6 +6,7 @@ import '../../../core/data/local/database_helper.dart';
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../core/widgets/app_main_header.dart';
 import '../../auth/services/supabase_auth_service.dart';
+import '../../events/screens/event_details_screen.dart';
 import '../../profile/services/supabase_profile_service.dart';
 import '../../../routes/app_router.dart';
 
@@ -27,11 +28,17 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
     {
       'image': 'assets/images/panaghigalaay.jpg',
       'name': 'Panaghigalaay 2025',
+      'date': 'March 05, 2026',
+      'timeIn': '08:00 AM - 08:15 AM',
+      'timeOut': '04:00 PM - 04:15 PM',
       'description': 'Join us for a day of celebration',
     },
     {
       'image': 'assets/images/buwan-ng-wika.jpg',
       'name': 'Buwan ng Wika 2025',
+      'date': 'March 12, 2026',
+      'timeIn': '08:00 AM - 08:15 AM',
+      'timeOut': '04:00 PM - 04:15 PM',
       'description': 'Show your love to Filipino',
     },
   ];
@@ -262,66 +269,111 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
             itemCount: todayEvents.length,
             itemBuilder: (context, index) {
               final event = todayEvents[index];
-              return Container(
-                width: 224,
-                margin: const EdgeInsets.only(right: 14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: const Color(0xFF003DA5).withOpacity(0.1),
+              return InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => EventDetailsScreen(
+                        eventImage:
+                            event['image'] ?? 'assets/images/panaghigalaay.jpg',
+                        eventName: event['name'] ?? 'Event',
+                        eventDate: event['date'] ?? 'Date not available',
+                        eventTime:
+                            'Time in: ${event['timeIn'] ?? 'Time-in not available'}\n'
+                            'Time out: ${event['timeOut'] ?? 'Time-out not available'}',
+                        description:
+                            event['description'] ??
+                            'No description available for this event.',
+                        isObligatory: false,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  width: 224,
+                  margin: const EdgeInsets.only(right: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: const Color(0xFF003DA5).withOpacity(0.1),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(14),
+                        ),
+                        child: Image.asset(
+                          event['image']!,
+                          width: 224,
+                          height: 150,
+                          fit: BoxFit.cover,
+                        ),
                       ),
-                      child: Image.asset(
-                        event['image']!,
-                        width: 224,
-                        height: 172,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            event['name']!,
-                            style: const TextStyle(
-                              color: Colors.black87,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              event['name']!,
+                              style: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            event['description']!,
-                            style: const TextStyle(
-                              color: Colors.black54,
-                              fontSize: 11,
+                            const SizedBox(height: 4),
+                            Text(
+                              event['description']!,
+                              style: const TextStyle(
+                                color: Colors.black54,
+                                fontSize: 11,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                            const SizedBox(height: 6),
+                            Text(
+                              'Time in: ${event['timeIn']}',
+                              style: const TextStyle(
+                                color: Color(0xFF003DA5),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Time out: ${event['timeOut']}',
+                              style: const TextStyle(
+                                color: Color(0xFF003DA5),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               );
             },
