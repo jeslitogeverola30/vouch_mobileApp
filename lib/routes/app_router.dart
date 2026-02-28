@@ -12,6 +12,7 @@ import '../features/profile/screens/activity_card_screen.dart';
 import '../features/profile/screens/change_email_screen.dart';
 import '../features/profile/screens/change_password_screen.dart';
 import '../features/profile/screens/profile_screen.dart';
+import '../features/profile/screens/sensitive_reauth_screen.dart';
 import '../features/profile/screens/students_database_screen.dart';
 import '../features/qr_code/screens/my_qr_code_screen.dart';
 
@@ -27,6 +28,7 @@ class AppRouter {
   static const String myQrCode = '/my-qr-code';
   static const String profile = '/profile';
   static const String activityCard = '/activity-card';
+  static const String sensitiveReauth = '/sensitive-reauth';
   static const String changeEmail = '/change-email';
   static const String changePassword = '/change-password';
   static const String studentsDatabase = '/students-database';
@@ -65,6 +67,13 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const ProfileScreen());
       case activityCard:
         return MaterialPageRoute(builder: (_) => const ActivityCardScreen());
+      case sensitiveReauth:
+        final nextRoute = settings.arguments is String
+            ? settings.arguments! as String
+            : changeEmail;
+        return MaterialPageRoute(
+          builder: (_) => SensitiveReauthScreen(nextRoute: nextRoute),
+        );
       case changeEmail:
         return MaterialPageRoute(builder: (_) => const ChangeEmailScreen());
       case changePassword:

@@ -73,6 +73,29 @@ class SupabaseAuthService {
     );
   }
 
+  static Future<UserResponse> requestEmailChange({required String newEmail}) {
+    return _auth.updateUser(UserAttributes(email: newEmail));
+  }
+
+  static Future<AuthResponse> verifyEmailChangeOtp({
+    required String email,
+    required String code,
+  }) {
+    return _auth.verifyOTP(
+      email: email,
+      token: code,
+      type: OtpType.emailChange,
+    );
+  }
+
+  static Future<void> resendEmailChangeOtp({required String email}) {
+    return _auth.resend(type: OtpType.emailChange, email: email);
+  }
+
+  static Future<UserResponse> updatePassword({required String newPassword}) {
+    return _auth.updateUser(UserAttributes(password: newPassword));
+  }
+
   static Future<void> signOut() {
     return _auth.signOut();
   }
