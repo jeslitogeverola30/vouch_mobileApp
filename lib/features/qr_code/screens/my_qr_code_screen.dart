@@ -5,6 +5,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'dart:convert';
 
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
+import '../../../core/widgets/app_main_header.dart';
 import '../../profile/services/supabase_profile_service.dart';
 import '../../../routes/app_router.dart';
 
@@ -15,6 +16,7 @@ const Color lightGray = Color(0xFFF5F5F5);
 const Color textGray = Color(0xFF666666);
 
 class QRScreen extends StatefulWidget {
+  final bool showChrome;
   final String userId;
   final String userName;
   final String userDegree;
@@ -23,6 +25,7 @@ class QRScreen extends StatefulWidget {
 
   const QRScreen({
     Key? key,
+    this.showChrome = true,
     this.userId = 'USER123',
     this.userName = 'Jeslito G. Geverola',
     this.userDegree = 'Bachelor of Science in Information Technology',
@@ -160,155 +163,98 @@ class _QRScreenState extends State<QRScreen> {
                 ),
               ),
             ),
-            SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.only(bottom: 20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildIntroCard(),
-                          const SizedBox(height: 20),
-                          _buildQrContentCard(),
-                          const SizedBox(height: 18),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: SizedBox(
-                              width: double.infinity,
-                              height: 52,
-                              child: ElevatedButton.icon(
-                                onPressed: _downloadQRCode,
-                                icon: const Icon(
-                                  Ionicons.download_outline,
-                                  size: 20,
-                                ),
-                                label: Text(
-                                  'Download QR Code',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: gold,
-                                  foregroundColor: royalBlue,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            widget.showChrome
+                ? SafeArea(child: _buildMainContent())
+                : _buildMainContent(),
           ],
         ),
-        bottomNavigationBar: AppBottomNavigationBar(
-          currentIndex: _selectedNavIndex,
-          onTap: (index) {
-            if (index == _selectedNavIndex) {
-              return;
-            }
+        bottomNavigationBar: widget.showChrome
+            ? AppBottomNavigationBar(
+                currentIndex: _selectedNavIndex,
+                onTap: (index) {
+                  if (index == _selectedNavIndex) {
+                    return;
+                  }
 
-            if (index == 0) {
-              Navigator.pushReplacementNamed(context, AppRouter.studentHome);
-              return;
-            }
+                  if (index == 0) {
+                    Navigator.pushReplacementNamed(
+                      context,
+                      AppRouter.studentHome,
+                    );
+                    return;
+                  }
 
-            if (index == 1) {
-              Navigator.pushReplacementNamed(context, AppRouter.events);
-              return;
-            }
+                  if (index == 1) {
+                    Navigator.pushReplacementNamed(context, AppRouter.events);
+                    return;
+                  }
 
-            if (index == 3) {
-              Navigator.pushReplacementNamed(context, AppRouter.payments);
-              return;
-            }
+                  if (index == 3) {
+                    Navigator.pushReplacementNamed(context, AppRouter.payments);
+                    return;
+                  }
 
-            if (index == 4) {
-              Navigator.pushReplacementNamed(context, AppRouter.profile);
-              return;
-            }
+                  if (index == 4) {
+                    Navigator.pushReplacementNamed(context, AppRouter.profile);
+                    return;
+                  }
 
-            setState(() {
-              _selectedNavIndex = index;
-            });
-          },
-        ),
+                  setState(() {
+                    _selectedNavIndex = index;
+                  });
+                },
+              )
+            : null,
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      color: Colors.white,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Image.asset(
-                'assets/logos/vouch_logo.png',
-                height: 40,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(width: 2),
-              Transform.translate(
-                offset: const Offset(-2, 0),
-                child: RichText(
-                  text: TextSpan(
-                    style: GoogleFonts.poppins(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
+  Widget _buildMainContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.showChrome) AppMainHeader(avatarPath: widget.userAvatarPath),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildIntroCard(),
+                const SizedBox(height: 20),
+                _buildQrContentCard(),
+                const SizedBox(height: 18),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton.icon(
+                      onPressed: _downloadQRCode,
+                      icon: const Icon(Ionicons.download_outline, size: 20),
+                      label: Text(
+                        'Download QR Code',
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: gold,
+                        foregroundColor: royalBlue,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
                     ),
-                    children: const [
-                      TextSpan(
-                        text: 'ou',
-                        style: TextStyle(color: Color(0xFF003DA5)),
-                      ),
-                      TextSpan(
-                        text: 'ch',
-                        style: TextStyle(color: Color(0xFFFFC107)),
-                      ),
-                    ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Ionicons.search, color: Color(0xFF003DA5)),
-                onPressed: () {},
-              ),
-              IconButton(
-                icon: const Icon(
-                  Ionicons.notifications,
-                  color: Color(0xFF003DA5),
-                ),
-                onPressed: () {},
-              ),
-              const SizedBox(width: 8),
-              CircleAvatar(
-                radius: 18,
-                backgroundImage: AssetImage(widget.userAvatarPath),
-              ),
-            ],
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

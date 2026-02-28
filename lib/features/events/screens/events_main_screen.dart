@@ -3,7 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
 
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
+import '../../../core/widgets/app_main_header.dart';
 import '../../../routes/app_router.dart';
+import 'event_details_screen.dart';
 
 const Color royalBlue = Color(0xFF003DA5);
 const Color gold = Color(0xFFFFC107);
@@ -12,7 +14,9 @@ const Color darkGray = Color(0xFF666666);
 const Color lightBlue = Color(0xFFE3F2FD);
 
 class EventsScreen extends StatefulWidget {
-  const EventsScreen({super.key});
+  final bool showChrome;
+
+  const EventsScreen({super.key, this.showChrome = true});
 
   @override
   State<EventsScreen> createState() => _EventsScreenState();
@@ -22,6 +26,7 @@ class _EventsScreenState extends State<EventsScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
   int _selectedNavIndex = 1;
+  final Map<String, int> _userRatings = {};
 
   @override
   void initState() {
@@ -69,125 +74,72 @@ class _EventsScreenState extends State<EventsScreen>
                 ),
               ),
             ),
-            SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(),
-                  const SizedBox(height: 6),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: const Color(0xFF003DA5).withOpacity(0.1),
-                        ),
-                      ),
-                      child: TabBar(
-                        controller: _tabController,
-                        labelColor: royalBlue,
-                        unselectedLabelColor: darkGray,
-                        indicatorColor: royalBlue,
-                        indicatorWeight: 3,
-                        labelStyle: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600,
-                        ),
-                        tabs: const [
-                          Tab(text: 'Today'),
-                          Tab(text: 'Upcoming'),
-                          Tab(text: 'Past'),
-                          Tab(text: 'Rate'),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _buildTodayTab(),
-                        _buildUpcomingTab(),
-                        _buildPastTab(),
-                        _buildRateTab(),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            widget.showChrome
+                ? SafeArea(child: _buildMainContent())
+                : _buildMainContent(),
           ],
         ),
-        bottomNavigationBar: AppBottomNavigationBar(
-          currentIndex: _selectedNavIndex,
-          onTap: _onNavTapped,
-        ),
+        bottomNavigationBar: widget.showChrome
+            ? AppBottomNavigationBar(
+                currentIndex: _selectedNavIndex,
+                onTap: _onNavTapped,
+              )
+            : null,
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      color: Colors.white,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
+  Widget _buildMainContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.showChrome) const AppMainHeader(),
+        if (widget.showChrome) const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: const Color(0xFF003DA5).withOpacity(0.1),
+              ),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              isScrollable: false,
+              labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+              labelColor: royalBlue,
+              unselectedLabelColor: darkGray,
+              dividerColor: Colors.transparent,
+              indicatorColor: royalBlue,
+              indicatorWeight: 3,
+              labelStyle: GoogleFonts.poppins(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+              tabs: const [
+                Tab(text: 'Today'),
+                Tab(text: 'Upcoming'),
+                Tab(text: 'Past'),
+                Tab(text: 'Rate'),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
             children: [
-              Image.asset(
-                'assets/logos/vouch_logo.png',
-                height: 40,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(width: 2),
-              Transform.translate(
-                offset: const Offset(-2, 0),
-                child: RichText(
-                  text: TextSpan(
-                    style: GoogleFonts.poppins(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    children: const [
-                      TextSpan(
-                        text: 'ou',
-                        style: TextStyle(color: Color(0xFF003DA5)),
-                      ),
-                      TextSpan(
-                        text: 'ch',
-                        style: TextStyle(color: Color(0xFFFFC107)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              _buildTodayTab(),
+              _buildUpcomingTab(),
+              _buildPastTab(),
+              _buildRateTab(),
             ],
           ),
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Ionicons.search, color: Color(0xFF003DA5)),
-                onPressed: () {},
-              ),
-              IconButton(
-                icon: const Icon(
-                  Ionicons.notifications,
-                  color: Color(0xFF003DA5),
-                ),
-                onPressed: () {},
-              ),
-              const SizedBox(width: 8),
-              const CircleAvatar(
-                radius: 18,
-                backgroundImage: AssetImage('assets/images/my_profile.png'),
-              ),
-            ],
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -222,9 +174,22 @@ class _EventsScreenState extends State<EventsScreen>
   }
 
   Widget _buildTodayTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Text('No events today'),
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(Ionicons.calendar_clear_outline, color: darkGray, size: 52),
+          SizedBox(height: 12),
+          Text(
+            'No events today',
+            style: TextStyle(
+              color: darkGray,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -233,28 +198,32 @@ class _EventsScreenState extends State<EventsScreen>
       {
         'name': 'Mind & Wellness',
         'date': 'November 06, 2026',
-        'time': '08:00 AM - 04:00 PM',
+        'timeIn': '08:00 AM - 08:15 AM',
+        'timeOut': '04:00 PM - 04:15 PM',
         'image': 'https://via.placeholder.com/300x200?text=Mind+Wellness',
         'isObligatory': false,
       },
       {
         'name': 'Service & Outreach',
         'date': 'November 10, 2026',
-        'time': '08:00 AM - 04:00 PM',
+        'timeIn': '08:00 AM - 08:15 AM',
+        'timeOut': '04:00 PM - 04:15 PM',
         'image': 'https://via.placeholder.com/300x200?text=Outreach',
         'isObligatory': false,
       },
       {
         'name': 'Siglakas Day 1',
         'date': 'April 06-12, 2026',
-        'time': '08:00 AM - 08:00 PM',
+        'timeIn': '08:00 AM - 08:15 AM',
+        'timeOut': '08:00 PM - 08:15 PM',
         'image': 'https://via.placeholder.com/300x200?text=Siglakas',
         'isObligatory': true,
       },
       {
         'name': 'Siglakas Day 2',
         'date': 'April 06-12, 2026',
-        'time': '08:00 AM - 08:00 PM',
+        'timeIn': '08:00 AM - 08:15 AM',
+        'timeOut': '08:00 PM - 08:15 PM',
         'image': 'https://via.placeholder.com/300x200?text=Siglakas+2',
         'isObligatory': true,
       },
@@ -349,7 +318,16 @@ class _EventsScreenState extends State<EventsScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  event['time'],
+                  'Time in: ${event['timeIn']}',
+                  style: const TextStyle(
+                    color: royalBlue,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Time out: ${event['timeOut']}',
                   style: const TextStyle(
                     color: royalBlue,
                     fontSize: 12,
@@ -367,9 +345,23 @@ class _EventsScreenState extends State<EventsScreen>
                       ),
                     ),
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('View Details: ${event['name']}'),
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EventDetailsScreen(
+                            eventImage:
+                                event['image'] as String? ??
+                                'https://via.placeholder.com/300x200?text=Event',
+                            eventName: event['name'] as String? ?? 'Event',
+                            eventDate:
+                                event['date'] as String? ??
+                                'Date not available',
+                            eventTime:
+                                'Time in: ${event['timeIn'] as String? ?? 'Time-in not available'}\n'
+                                'Time out: ${event['timeOut'] as String? ?? 'Time-out not available'}',
+                            isObligatory:
+                                event['isObligatory'] as bool? ?? false,
+                          ),
                         ),
                       );
                     },
@@ -458,31 +450,39 @@ class _EventsScreenState extends State<EventsScreen>
             style: const TextStyle(color: darkGray, fontSize: 14),
           ),
           const SizedBox(height: 12),
-          if (event['attended'])
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildTimeRow('Time-in:', event['timeIn']),
-                const SizedBox(height: 8),
-                _buildTimeRow('Time-out:', event['timeOut']),
-              ],
-            )
-          else
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Text(
-                'Not Attended',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ),
+          SizedBox(
+            height: 40,
+            child: event['attended']
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildTimeRow('Time-in:', event['timeIn']),
+                      _buildTimeRow('Time-out:', event['timeOut']),
+                    ],
+                  )
+                : Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'Not Attended',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+          ),
         ],
       ),
     );
@@ -534,6 +534,9 @@ class _EventsScreenState extends State<EventsScreen>
   }
 
   Widget _buildRateEventCard(Map<String, dynamic> event) {
+    final eventName = event['name'] as String? ?? 'Event';
+    final selectedRating = _userRatings[eventName] ?? 0;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -618,11 +621,21 @@ class _EventsScreenState extends State<EventsScreen>
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: IconButton(
                     onPressed: () {
+                      final rating = index + 1;
+                      setState(() {
+                        _userRatings[eventName] = rating;
+                      });
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Rated ${index + 1} stars')),
+                        SnackBar(content: Text('Rated $rating stars')),
                       );
                     },
-                    icon: Icon(Ionicons.star_outline, color: gold, size: 32),
+                    icon: Icon(
+                      index < selectedRating
+                          ? Ionicons.star
+                          : Ionicons.star_outline,
+                      color: index < selectedRating ? gold : darkGray,
+                      size: 32,
+                    ),
                   ),
                 ),
               ),
@@ -654,7 +667,11 @@ class _EventsScreenState extends State<EventsScreen>
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Rating submitted for ${event['name']}'),
+                    content: Text(
+                      selectedRating > 0
+                          ? 'Rating submitted for $eventName: $selectedRating stars'
+                          : 'Please select a rating for $eventName',
+                    ),
                   ),
                 );
               },

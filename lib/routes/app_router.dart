@@ -4,17 +4,13 @@ import '../features/auth/screens/email_verification_screen.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/sign_in_verification_screen.dart';
 import '../features/auth/screens/sign_up_screen.dart';
-import '../features/events/screens/events_main_screen.dart';
 import '../features/home/screens/admin_home_screen.dart';
-import '../features/home/screens/student_home_screen.dart';
-import '../features/payments/screens/payment_screen.dart';
+import '../features/main/screens/main_shell_screen.dart';
 import '../features/profile/screens/activity_card_screen.dart';
 import '../features/profile/screens/change_email_screen.dart';
 import '../features/profile/screens/change_password_screen.dart';
-import '../features/profile/screens/profile_screen.dart';
 import '../features/profile/screens/sensitive_reauth_screen.dart';
 import '../features/profile/screens/students_database_screen.dart';
-import '../features/qr_code/screens/my_qr_code_screen.dart';
 
 class AppRouter {
   static const String login = '/login';
@@ -54,17 +50,27 @@ class AppRouter {
           builder: (_) => SignInVerificationScreen(email: email),
         );
       case events:
-        return MaterialPageRoute(builder: (_) => const EventsScreen());
+        return MaterialPageRoute(
+          builder: (_) => const MainShellScreen(initialIndex: 1),
+        );
       case payments:
-        return MaterialPageRoute(builder: (_) => const PaymentsScreen());
+        return MaterialPageRoute(
+          builder: (_) => const MainShellScreen(initialIndex: 3),
+        );
       case studentHome:
-        return MaterialPageRoute(builder: (_) => const StudentHomeScreen());
+        return MaterialPageRoute(
+          builder: (_) => const MainShellScreen(initialIndex: 0),
+        );
       case adminHome:
         return MaterialPageRoute(builder: (_) => const AdminHomeScreen());
       case myQrCode:
-        return MaterialPageRoute(builder: (_) => const QRScreen());
+        return MaterialPageRoute(
+          builder: (_) => const MainShellScreen(initialIndex: 2),
+        );
       case profile:
-        return MaterialPageRoute(builder: (_) => const ProfileScreen());
+        return MaterialPageRoute(
+          builder: (_) => const MainShellScreen(initialIndex: 4),
+        );
       case activityCard:
         return MaterialPageRoute(builder: (_) => const ActivityCardScreen());
       case sensitiveReauth:

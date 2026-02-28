@@ -5,6 +5,6 @@ class RateEventScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: Text('Rate Event Screen')));
+    return const Scaffold(body: Center(child: Text('Rated Event Screen')));
   }
 }

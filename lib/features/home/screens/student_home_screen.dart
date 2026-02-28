@@ -4,12 +4,15 @@ import 'package:ionicons/ionicons.dart';
 
 import '../../../core/data/local/database_helper.dart';
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
+import '../../../core/widgets/app_main_header.dart';
 import '../../auth/services/supabase_auth_service.dart';
 import '../../profile/services/supabase_profile_service.dart';
 import '../../../routes/app_router.dart';
 
 class StudentHomeScreen extends StatefulWidget {
-  const StudentHomeScreen({super.key});
+  final bool showChrome;
+
+  const StudentHomeScreen({super.key, this.showChrome = true});
 
   @override
   State<StudentHomeScreen> createState() => _StudentHomeScreenState();
@@ -104,136 +107,72 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                 ),
               ),
             ),
-            // Main content
-            SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Greeting section
-                          _buildGreetingSection(),
-                          const SizedBox(height: 24),
-                          // Today's Event
-                          _buildTodaysEventSection(),
-                          const SizedBox(height: 20),
-                          // Quick Actions
-                          _buildQuickActionsSection(),
-                          const SizedBox(height: 24),
-                          // Statistics
-                          _buildStatisticsSection(),
-                          const SizedBox(height: 20),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            widget.showChrome
+                ? SafeArea(child: _buildMainContent())
+                : _buildMainContent(),
           ],
         ),
-        bottomNavigationBar: AppBottomNavigationBar(
-          currentIndex: _selectedNavIndex,
-          onTap: (index) {
-            if (index == _selectedNavIndex) {
-              return;
-            }
+        bottomNavigationBar: widget.showChrome
+            ? AppBottomNavigationBar(
+                currentIndex: _selectedNavIndex,
+                onTap: (index) {
+                  if (index == _selectedNavIndex) {
+                    return;
+                  }
 
-            if (index == 1) {
-              Navigator.pushReplacementNamed(context, AppRouter.events);
-              return;
-            }
+                  if (index == 1) {
+                    Navigator.pushReplacementNamed(context, AppRouter.events);
+                    return;
+                  }
 
-            if (index == 2) {
-              Navigator.pushReplacementNamed(context, AppRouter.myQrCode);
-              return;
-            }
+                  if (index == 2) {
+                    Navigator.pushReplacementNamed(context, AppRouter.myQrCode);
+                    return;
+                  }
 
-            if (index == 3) {
-              Navigator.pushReplacementNamed(context, AppRouter.payments);
-              return;
-            }
+                  if (index == 3) {
+                    Navigator.pushReplacementNamed(context, AppRouter.payments);
+                    return;
+                  }
 
-            if (index == 4) {
-              Navigator.pushReplacementNamed(context, AppRouter.profile);
-              return;
-            }
+                  if (index == 4) {
+                    Navigator.pushReplacementNamed(context, AppRouter.profile);
+                    return;
+                  }
 
-            setState(() {
-              _selectedNavIndex = index;
-            });
-          },
-        ),
+                  setState(() {
+                    _selectedNavIndex = index;
+                  });
+                },
+              )
+            : null,
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      color: Colors.white,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Logo and brand
-          Row(
-            children: [
-              Image.asset(
-                'assets/logos/vouch_logo.png',
-                height: 40,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(width: 2),
-              Transform.translate(
-                offset: const Offset(-2, 0),
-                child: RichText(
-                  text: TextSpan(
-                    style: GoogleFonts.poppins(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    children: const [
-                      TextSpan(
-                        text: 'ou',
-                        style: TextStyle(color: Color(0xFF003DA5)),
-                      ),
-                      TextSpan(
-                        text: 'ch',
-                        style: TextStyle(color: Color(0xFFFFC107)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+  Widget _buildMainContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.showChrome) const AppMainHeader(),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildGreetingSection(),
+                const SizedBox(height: 24),
+                _buildTodaysEventSection(),
+                const SizedBox(height: 20),
+                _buildQuickActionsSection(),
+                const SizedBox(height: 24),
+                _buildStatisticsSection(),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
-          // Notification and profile
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Ionicons.search, color: Color(0xFF003DA5)),
-                onPressed: () {},
-              ),
-              IconButton(
-                icon: const Icon(
-                  Ionicons.notifications,
-                  color: Color(0xFF003DA5),
-                ),
-                onPressed: () {},
-              ),
-              const SizedBox(width: 8),
-              const CircleAvatar(
-                radius: 18,
-                backgroundImage: AssetImage('assets/images/my_profile.png'),
-              ),
-            ],
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
