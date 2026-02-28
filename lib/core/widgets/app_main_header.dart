@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
 
+import '../../routes/app_router.dart';
+
 class AppMainHeader extends StatelessWidget {
   final String avatarPath;
+  final VoidCallback? onAvatarTap;
 
   const AppMainHeader({
     super.key,
     this.avatarPath = 'assets/images/my_profile.png',
+    this.onAvatarTap,
   });
 
   @override
@@ -63,7 +67,20 @@ class AppMainHeader extends StatelessWidget {
                 onPressed: () {},
               ),
               const SizedBox(width: 8),
-              CircleAvatar(radius: 18, backgroundImage: AssetImage(avatarPath)),
+              InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  if (onAvatarTap != null) {
+                    onAvatarTap!();
+                    return;
+                  }
+                  Navigator.pushReplacementNamed(context, AppRouter.profile);
+                },
+                child: CircleAvatar(
+                  radius: 18,
+                  backgroundImage: AssetImage(avatarPath),
+                ),
+              ),
             ],
           ),
         ],
