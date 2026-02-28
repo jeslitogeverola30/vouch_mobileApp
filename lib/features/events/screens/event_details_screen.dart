@@ -14,8 +14,7 @@ class EventDetailsScreen extends StatelessWidget {
 
   const EventDetailsScreen({
     super.key,
-    this.eventImage =
-        'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Events%28Upcoming%29-Student-eventdetails4-BUKMKZsFFXsLgCCaLdHmlu9B7Kw62H.png',
+    this.eventImage = 'assets/images/event-siglakas.jpg',
     this.eventName = 'Siglakas 2026 Day 2',
     this.eventDate = 'April 11, 2026',
     this.eventTime =
@@ -174,7 +173,10 @@ class EventDetailsScreen extends StatelessWidget {
   }
 
   Widget _buildEventImage() {
+    final isAssetImage = eventImage.startsWith('assets/');
+
     return Container(
+      width: double.infinity,
       height: 200,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
@@ -189,18 +191,41 @@ class EventDetailsScreen extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
-        child: Image.network(
-          eventImage,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              color: const Color(0xFFE5E7EB),
-              child: const Center(
-                child: Icon(Ionicons.image, color: Color(0xFF9CA3AF), size: 46),
+        child: isAssetImage
+            ? Image.asset(
+                eventImage,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: const Color(0xFFE5E7EB),
+                    child: const Center(
+                      child: Icon(
+                        Ionicons.image,
+                        color: Color(0xFF9CA3AF),
+                        size: 46,
+                      ),
+                    ),
+                  );
+                },
+              )
+            : Image.network(
+                eventImage,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: const Color(0xFFE5E7EB),
+                    child: const Center(
+                      child: Icon(
+                        Ionicons.image,
+                        color: Color(0xFF9CA3AF),
+                        size: 46,
+                      ),
+                    ),
+                  );
+                },
               ),
-            );
-          },
-        ),
       ),
     );
   }

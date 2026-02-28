@@ -200,7 +200,7 @@ class _EventsScreenState extends State<EventsScreen>
         'date': 'November 06, 2026',
         'timeIn': '08:00 AM - 08:15 AM',
         'timeOut': '04:00 PM - 04:15 PM',
-        'image': 'https://via.placeholder.com/300x200?text=Mind+Wellness',
+        'image': 'assets/images/mind-wellnes.jpg',
         'isObligatory': false,
       },
       {
@@ -208,7 +208,7 @@ class _EventsScreenState extends State<EventsScreen>
         'date': 'November 10, 2026',
         'timeIn': '08:00 AM - 08:15 AM',
         'timeOut': '04:00 PM - 04:15 PM',
-        'image': 'https://via.placeholder.com/300x200?text=Outreach',
+        'image': 'assets/images/service-outreach.jpg',
         'isObligatory': false,
       },
       {
@@ -216,7 +216,7 @@ class _EventsScreenState extends State<EventsScreen>
         'date': 'April 06-12, 2026',
         'timeIn': '08:00 AM - 08:15 AM',
         'timeOut': '08:00 PM - 08:15 PM',
-        'image': 'https://via.placeholder.com/300x200?text=Siglakas',
+        'image': 'assets/images/event-siglakas.jpg',
         'isObligatory': true,
       },
       {
@@ -224,7 +224,7 @@ class _EventsScreenState extends State<EventsScreen>
         'date': 'April 06-12, 2026',
         'timeIn': '08:00 AM - 08:15 AM',
         'timeOut': '08:00 PM - 08:15 PM',
-        'image': 'https://via.placeholder.com/300x200?text=Siglakas+2',
+        'image': 'assets/images/event-siglakas.jpg',
         'isObligatory': true,
       },
     ];
@@ -260,7 +260,7 @@ class _EventsScreenState extends State<EventsScreen>
               height: 200,
               width: double.infinity,
               color: lightGray,
-              child: Image.network(
+              child: Image.asset(
                 event['image'],
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
@@ -351,7 +351,7 @@ class _EventsScreenState extends State<EventsScreen>
                           builder: (_) => EventDetailsScreen(
                             eventImage:
                                 event['image'] as String? ??
-                                'https://via.placeholder.com/300x200?text=Event',
+                                'assets/images/event-siglakas.jpg',
                             eventName: event['name'] as String? ?? 'Event',
                             eventDate:
                                 event['date'] as String? ??
