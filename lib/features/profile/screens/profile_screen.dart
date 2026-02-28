@@ -4,11 +4,13 @@ import 'package:ionicons/ionicons.dart';
 
 import '../../../core/data/local/database_helper.dart';
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
+import '../../../core/widgets/app_main_header.dart';
 import '../../../routes/app_router.dart';
 import '../../auth/services/supabase_auth_service.dart';
 import '../services/supabase_profile_service.dart';
 
 class ProfileScreen extends StatefulWidget {
+  final bool showChrome;
   final String userName;
   final String userRole;
   final String userEmail;
@@ -20,6 +22,7 @@ class ProfileScreen extends StatefulWidget {
 
   const ProfileScreen({
     super.key,
+    this.showChrome = true,
     this.userName = 'Jeslito G. Geverola',
     this.userRole = 'DOrSU Student',
     this.userEmail = 'jeslito.geverola@dorsu.edu.ph',
@@ -253,210 +256,126 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             ),
-            SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: _buildProfileSummaryCard(),
-                          ),
-                          const SizedBox(height: 22),
-                          _buildSectionHeader(
-                            title: 'Academic Details',
-                            subtitle: 'Your student profile information',
-                          ),
-                          const SizedBox(height: 12),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: Column(
-                              children: [
-                                _buildInfoCard(
-                                  icon: Ionicons.card_outline,
-                                  label: 'Student ID',
-                                  value: _studentId,
-                                ),
-                                const SizedBox(height: 12),
-                                _buildInfoCard(
-                                  icon: Ionicons.people,
-                                  label: 'Faculty',
-                                  value: _faculty,
-                                ),
-                                const SizedBox(height: 12),
-                                _buildInfoCard(
-                                  icon: Ionicons.school_outline,
-                                  label: 'Program',
-                                  value: _program,
-                                ),
-                                const SizedBox(height: 12),
-                                _buildAccountActionButton(
-                                  icon: Ionicons.document_outline,
-                                  title: 'View Activity Card',
-                                  subtitle: 'See your student activity details',
-                                  onTap: () {
-                                    Navigator.pushNamed(
-                                      context,
-                                      AppRouter.activityCard,
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 22),
-                          _buildSectionHeader(
-                            title: 'Account',
-                            subtitle: 'Manage your login and security settings',
-                          ),
-                          const SizedBox(height: 12),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: Column(
-                              children: [
-                                _buildAccountActionButton(
-                                  icon: Ionicons.mail_outline,
-                                  title: 'Change Email',
-                                  subtitle: 'Update your account email address',
-                                  onTap: () {
-                                    Navigator.pushNamed(
-                                      context,
-                                      AppRouter.sensitiveReauth,
-                                      arguments: AppRouter.changeEmail,
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 12),
-                                _buildAccountActionButton(
-                                  icon: Ionicons.lock_closed_outline,
-                                  title: 'Change Password',
-                                  subtitle:
-                                      'Secure your account with a new password',
-                                  onTap: () {
-                                    Navigator.pushNamed(
-                                      context,
-                                      AppRouter.sensitiveReauth,
-                                      arguments: AppRouter.changePassword,
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 12),
-                                _buildAccountActionButton(
-                                  icon: Ionicons.log_out_outline,
-                                  title: 'Logout',
-                                  subtitle: 'Sign out from this device',
-                                  onTap: _handleLogout,
-                                  isDestructive: true,
-                                ),
-                                const SizedBox(height: 34),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            widget.showChrome
+                ? SafeArea(child: _buildMainContent())
+                : _buildMainContent(),
           ],
         ),
-        bottomNavigationBar: AppBottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: _onNavItemTapped,
-        ),
+        bottomNavigationBar: widget.showChrome
+            ? AppBottomNavigationBar(
+                currentIndex: _selectedIndex,
+                onTap: _onNavItemTapped,
+              )
+            : null,
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      color: Colors.white,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Image.asset(
-                'assets/logos/vouch_logo.png',
-                height: 40,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(width: 2),
-              Transform.translate(
-                offset: const Offset(-2, 0),
-                child: RichText(
-                  text: TextSpan(
-                    style: GoogleFonts.poppins(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    children: const [
-                      TextSpan(
-                        text: 'ou',
-                        style: TextStyle(color: Color(0xFF003DA5)),
+  Widget _buildMainContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.showChrome) AppMainHeader(avatarPath: widget.avatarPath),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _buildProfileSummaryCard(),
+                ),
+                const SizedBox(height: 22),
+                _buildSectionHeader(
+                  title: 'Academic Details',
+                  subtitle: 'Your student profile information',
+                ),
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    children: [
+                      _buildInfoCard(
+                        icon: Ionicons.card_outline,
+                        label: 'Student ID',
+                        value: _studentId,
                       ),
-                      TextSpan(
-                        text: 'ch',
-                        style: TextStyle(color: Color(0xFFFFC107)),
+                      const SizedBox(height: 12),
+                      _buildInfoCard(
+                        icon: Ionicons.people,
+                        label: 'Faculty',
+                        value: _faculty,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildInfoCard(
+                        icon: Ionicons.school_outline,
+                        label: 'Program',
+                        value: _program,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildAccountActionButton(
+                        icon: Ionicons.document_outline,
+                        title: 'View Activity Card',
+                        subtitle: 'See your student activity details',
+                        onTap: () {
+                          Navigator.pushNamed(context, AppRouter.activityCard);
+                        },
                       ),
                     ],
                   ),
                 ),
-              ),
-            ],
-          ),
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Ionicons.search, color: Color(0xFF003DA5)),
-                onPressed: () {},
-              ),
-              IconButton(
-                icon: const Icon(
-                  Ionicons.notifications,
-                  color: Color(0xFF003DA5),
+                const SizedBox(height: 22),
+                _buildSectionHeader(
+                  title: 'Account',
+                  subtitle: 'Manage your login and security settings',
                 ),
-                onPressed: () {},
-              ),
-              const SizedBox(width: 8),
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(19),
-                  child: Image.asset(
-                    widget.avatarPath,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: const Color(0xFFE8F0F8),
-                        child: const Center(
-                          child: Icon(
-                            Ionicons.person,
-                            size: 20,
-                            color: Color(0xFF003DA5),
-                          ),
-                        ),
-                      );
-                    },
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    children: [
+                      _buildAccountActionButton(
+                        icon: Ionicons.mail_outline,
+                        title: 'Change Email',
+                        subtitle: 'Update your account email address',
+                        onTap: () {
+                          Navigator.pushNamed(
+                            context,
+                            AppRouter.sensitiveReauth,
+                            arguments: AppRouter.changeEmail,
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildAccountActionButton(
+                        icon: Ionicons.lock_closed_outline,
+                        title: 'Change Password',
+                        subtitle: 'Secure your account with a new password',
+                        onTap: () {
+                          Navigator.pushNamed(
+                            context,
+                            AppRouter.sensitiveReauth,
+                            arguments: AppRouter.changePassword,
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildAccountActionButton(
+                        icon: Ionicons.log_out_outline,
+                        title: 'Logout',
+                        subtitle: 'Sign out from this device',
+                        onTap: _handleLogout,
+                        isDestructive: true,
+                      ),
+                      const SizedBox(height: 34),
+                    ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

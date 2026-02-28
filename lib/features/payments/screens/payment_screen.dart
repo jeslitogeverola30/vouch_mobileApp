@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:ionicons/ionicons.dart';
 
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
+import '../../../core/widgets/app_main_header.dart';
 import 'proof_of_payment_screen.dart';
 import '../../../routes/app_router.dart';
 
 class PaymentsScreen extends StatefulWidget {
-  const PaymentsScreen({super.key});
+  final bool showChrome;
+
+  const PaymentsScreen({super.key, this.showChrome = true});
 
   @override
   State<PaymentsScreen> createState() => _PaymentsScreenState();
@@ -95,112 +97,54 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                 ),
               ),
             ),
-            SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.only(bottom: 20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildSummaryCard(),
-                          const SizedBox(height: 18),
-                          _buildTabs(),
-                          const SizedBox(height: 14),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: Column(
-                              children: _filteredPayments
-                                  .map(
-                                    (payment) => _PaymentCard(
-                                      payment: payment,
-                                      onActionTap: () =>
-                                          _handlePaymentAction(payment),
-                                    ),
-                                  )
-                                  .toList(),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            widget.showChrome
+                ? SafeArea(child: _buildMainContent())
+                : _buildMainContent(),
           ],
         ),
-        bottomNavigationBar: AppBottomNavigationBar(
-          currentIndex: _selectedNavIndex,
-          onTap: _onNavTapped,
-        ),
+        bottomNavigationBar: widget.showChrome
+            ? AppBottomNavigationBar(
+                currentIndex: _selectedNavIndex,
+                onTap: _onNavTapped,
+              )
+            : null,
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      color: Colors.white,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Image.asset(
-                'assets/logos/vouch_logo.png',
-                height: 40,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(width: 2),
-              Transform.translate(
-                offset: const Offset(-2, 0),
-                child: RichText(
-                  text: TextSpan(
-                    style: GoogleFonts.poppins(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    children: const [
-                      TextSpan(
-                        text: 'ou',
-                        style: TextStyle(color: Color(0xFF003DA5)),
-                      ),
-                      TextSpan(
-                        text: 'ch',
-                        style: TextStyle(color: Color(0xFFFFC107)),
-                      ),
-                    ],
+  Widget _buildMainContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.showChrome) const AppMainHeader(),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSummaryCard(),
+                const SizedBox(height: 18),
+                _buildTabs(),
+                const SizedBox(height: 14),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    children: _filteredPayments
+                        .map(
+                          (payment) => _PaymentCard(
+                            payment: payment,
+                            onActionTap: () => _handlePaymentAction(payment),
+                          ),
+                        )
+                        .toList(),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Ionicons.search, color: Color(0xFF003DA5)),
-                onPressed: () {},
-              ),
-              IconButton(
-                icon: const Icon(
-                  Ionicons.notifications,
-                  color: Color(0xFF003DA5),
-                ),
-                onPressed: () {},
-              ),
-              const SizedBox(width: 8),
-              const CircleAvatar(
-                radius: 18,
-                backgroundImage: AssetImage('assets/images/my_profile.png'),
-              ),
-            ],
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
