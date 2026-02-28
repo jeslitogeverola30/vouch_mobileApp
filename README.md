@@ -1,16 +1,24 @@
-# vouch_mobileapp
+Vouch App 📱
+Vouch is a robust Flutter mobile application designed to simplify campus life by digitizing event tracking and administrative workflows. It bridges the gap between student organizations and university administrations through automated clearance systems.
 
-A new Flutter project.
 
-## Getting Started
 
-This project is a starting point for a Flutter application.
+✨ Key Features
+- QR-Based Attendance: Quick, contactless check-ins at events using unique QR code generation and scanning.
 
-A few resources to get you started if this is your first Flutter project:
+- Digital Fee Management: Securely upload and store proof of payment (receipts) for organization dues and university fees.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+- Automated Clearance: Instantly updates student activity card status upon verification of attendance and payments.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- Real-time Synchronization: Powered by a cloud backend to ensure data is consistent across all student and admin devices.
+
+
+
+🛠 Tech Stack
+Framework: Flutter (v3.0+)
+
+- Language: Dart
+
+- Backend: Firebase (Firestore for database, Storage for receipts, Auth for security)
+
+- Scanning: mobile_scanner & qr_flutter
