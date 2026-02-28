@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../core/utils/global_header_search.dart';
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../core/widgets/app_main_header.dart';
 import 'proof_of_payment_screen.dart';
@@ -119,7 +120,8 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.showChrome) const AppMainHeader(),
+        if (widget.showChrome)
+          AppMainHeader(onSearchTap: () => openGlobalHeaderSearch(context)),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.only(bottom: 20),

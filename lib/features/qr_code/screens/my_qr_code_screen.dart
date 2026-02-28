@@ -4,6 +4,7 @@ import 'package:ionicons/ionicons.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'dart:convert';
 
+import '../../../core/utils/global_header_search.dart';
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../core/widgets/app_main_header.dart';
 import '../../profile/services/supabase_profile_service.dart';
@@ -213,7 +214,11 @@ class _QRScreenState extends State<QRScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.showChrome) AppMainHeader(avatarPath: widget.userAvatarPath),
+        if (widget.showChrome)
+          AppMainHeader(
+            avatarPath: widget.userAvatarPath,
+            onSearchTap: () => openGlobalHeaderSearch(context),
+          ),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.only(bottom: 20),

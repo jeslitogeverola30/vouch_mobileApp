@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
 
 import '../../../core/data/local/database_helper.dart';
+import '../../../core/utils/global_header_search.dart';
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../core/widgets/app_main_header.dart';
 import '../../auth/services/supabase_auth_service.dart';
@@ -22,6 +23,7 @@ class StudentHomeScreen extends StatefulWidget {
 class _StudentHomeScreenState extends State<StudentHomeScreen> {
   int _selectedNavIndex = 0;
   String _studentName = 'Student';
+  String? _pressedActionLabel;
 
   // Mock data for events
   final List<Map<String, String>> todayEvents = [
@@ -77,6 +79,18 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
     setState(() {
       _studentName = firstName;
     });
+  }
+
+  void _openMyQr() {
+    Navigator.pushReplacementNamed(context, AppRouter.myQrCode);
+  }
+
+  void _openPayments() {
+    Navigator.pushReplacementNamed(context, AppRouter.payments);
+  }
+
+  void _openRateEvent() {
+    Navigator.pushReplacementNamed(context, AppRouter.events, arguments: 3);
   }
 
   @override
@@ -161,7 +175,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.showChrome) const AppMainHeader(),
+        if (widget.showChrome)
+          AppMainHeader(onSearchTap: () => openGlobalHeaderSearch(context)),
         Expanded(
           child: SingleChildScrollView(
             child: Column(
@@ -401,6 +416,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                   icon: Ionicons.qr_code,
                   label: 'My QR',
                   isHighlighted: true,
+                  onTap: _openMyQr,
                 ),
               ),
               const SizedBox(width: 12),
@@ -408,6 +424,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                 child: _buildActionCard(
                   icon: Ionicons.wallet,
                   label: 'Payments',
+                  onTap: _openPayments,
                 ),
               ),
               const SizedBox(width: 12),
@@ -415,6 +432,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                 child: _buildActionCard(
                   icon: Ionicons.star,
                   label: 'Rate Event',
+                  onTap: _openRateEvent,
                 ),
               ),
             ],
@@ -427,17 +445,34 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
   Widget _buildActionCard({
     required IconData icon,
     required String label,
+    required VoidCallback onTap,
     bool isHighlighted = false,
   }) {
+    final isPressed = _pressedActionLabel == label;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () {},
-        child: Container(
+        onHighlightChanged: (value) {
+          if (!mounted) {
+            return;
+          }
+          setState(() {
+            _pressedActionLabel = value ? label : null;
+          });
+        },
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
           decoration: BoxDecoration(
-            color: isHighlighted ? const Color(0xFFFFC107) : Colors.white,
+            color: isPressed
+                ? (isHighlighted
+                      ? const Color(0xFFE4AF00)
+                      : const Color(0xFF003DA5).withOpacity(0.12))
+                : (isHighlighted ? const Color(0xFFFFC107) : Colors.white),
             border: Border.all(
               color: isHighlighted
                   ? const Color(0xFFFFC107)
@@ -459,9 +494,13 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: isHighlighted
-                      ? Colors.white.withOpacity(0.35)
-                      : const Color(0xFF003DA5).withOpacity(0.08),
+                  color: isPressed
+                      ? (isHighlighted
+                            ? Colors.white.withOpacity(0.48)
+                            : const Color(0xFF003DA5).withOpacity(0.14))
+                      : (isHighlighted
+                            ? Colors.white.withOpacity(0.35)
+                            : const Color(0xFF003DA5).withOpacity(0.08)),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: const Color(0xFF003DA5), size: 24),
