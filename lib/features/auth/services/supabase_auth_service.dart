@@ -110,4 +110,33 @@ class SupabaseAuthService {
   static Future<void> signOut() {
     return _auth.signOut();
   }
+
+  static Future<String> determineUserRole() async {
+    final user = currentUser;
+    if (user == null || user.email == null) {
+      throw Exception('No authenticated user found');
+    }
+
+    final email = user.email!;
+
+    // 1. Check admins table first (priority)
+    final adminCheck = await Supabase.instance.client
+        .from('admins')
+        .select('id')
+        .ilike('email', email)
+        .maybeSingle();
+
+    if (adminCheck != null) return 'admin';
+
+    // 2. Then check students table
+    final studentCheck = await Supabase.instance.client
+        .from('students')
+        .select('student_id')
+        .ilike('email', email)
+        .maybeSingle();
+
+    if (studentCheck != null) return 'student';
+
+    throw Exception('User role could not be determined');
+  }
 }

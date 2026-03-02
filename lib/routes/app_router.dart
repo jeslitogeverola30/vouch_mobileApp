@@ -30,6 +30,7 @@ class AppRouter {
   static const String changeEmail = '/change-email';
   static const String changePassword = '/change-password';
   static const String studentsDatabase = '/students-database';
+  
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
