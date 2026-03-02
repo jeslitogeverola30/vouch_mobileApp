@@ -5,7 +5,7 @@ import '../features/auth/screens/forgot_password_screen.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/sign_in_verification_screen.dart';
 import '../features/auth/screens/sign_up_screen.dart';
-import '../features/home/screens/admin_home_screen.dart';
+import '../features/main/screens/admin_main_shell_screen.dart';
 import '../features/main/screens/main_shell_screen.dart';
 import '../features/profile/screens/activity_card_screen.dart';
 import '../features/profile/screens/change_email_screen.dart';
@@ -77,7 +77,12 @@ class AppRouter {
           builder: (_) => const MainShellScreen(initialIndex: 0),
         );
       case adminHome:
-        return MaterialPageRoute(builder: (_) => const AdminHomeScreen());
+        final initialAdminTab = settings.arguments is int
+            ? settings.arguments! as int
+            : 0;
+        return MaterialPageRoute(
+          builder: (_) => AdminMainShellScreen(initialIndex: initialAdminTab),
+        );
       case myQrCode:
         return MaterialPageRoute(
           builder: (_) => const MainShellScreen(initialIndex: 2),
