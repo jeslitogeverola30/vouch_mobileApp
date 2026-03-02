@@ -81,6 +81,38 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.1"
+  checked_yaml:
+    dependency: transitive
+    description:
+      name: checked_yaml
+      sha256: "959525d3162f249993882720d52b7e0c833978df229be20702b33d48d91de70f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.4"
+  clerk_auth:
+    dependency: "direct main"
+    description:
+      name: clerk_auth
+      sha256: "9dba5fe674de759f46d5501230f954d4841f1a9497113fd62a61440ae4931c8d"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.14-beta"
+  clerk_flutter:
+    dependency: "direct main"
+    description:
+      name: clerk_flutter
+      sha256: a0bc7873dc14b7662fb8bcfae9c038225600b633e25eb9c582a3a01ef5c79925
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.14-beta"
+  cli_util:
+    dependency: transitive
+    description:
+      name: cli_util
+      sha256: ff6785f7e9e3c38ac98b2fb035701789de90154024a75b6cb926445e83197d1c
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.4.2"
   clock:
     dependency: transitive
     description:
