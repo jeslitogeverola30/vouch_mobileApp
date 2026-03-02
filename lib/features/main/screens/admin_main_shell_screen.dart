@@ -39,7 +39,10 @@ class _AdminMainShellScreenState extends State<AdminMainShellScreen> {
         body: SafeArea(
           child: Column(
             children: [
-              AppMainHeader(onSearchTap: () => openGlobalHeaderSearch(context)),
+              AppMainHeader(
+                avatarPath: 'assets/logos/facet_logo.jpg',
+                onSearchTap: () => openGlobalHeaderSearch(context),
+              ),
               Expanded(
                 child: IndexedStack(
                   index: _currentIndex,

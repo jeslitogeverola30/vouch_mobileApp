@@ -286,9 +286,7 @@ class _LoginScreenState extends State<LoginScreen> {
         password: password,
       );
     } catch (error) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
       final message = error.toString().toLowerCase();
       final requiresVerification =
@@ -298,9 +296,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (requiresVerification) {
         await SupabaseAuthService.sendSignInOtp(email: identifier);
 
-        if (!mounted) {
-          return;
-        }
+        if (!mounted) return;
 
         setState(() => _isSubmitting = false);
 
@@ -311,34 +307,60 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       setState(() => _isSubmitting = false);
-
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(error.toString())));
       return;
     }
 
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     setState(() => _isSubmitting = false);
 
-    if (SupabaseAuthService.currentUser != null) {
-      try {
-        await SupabaseProfileService.ensureCurrentUserProfile();
-      } catch (_) {}
-
-      Navigator.of(
-        context,
-      ).pushNamedAndRemoveUntil(AppRouter.studentHome, (route) => false);
+    if (SupabaseAuthService.currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid email or password.')),
+      );
       return;
     }
 
-    const fallbackMessage = 'Invalid email or password.';
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text(fallbackMessage)));
+    try {
+      final role = await SupabaseAuthService.determineUserRole();
+
+      if (!mounted) return;
+
+      if (role == 'admin') {
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRouter.adminHome, (route) => false);
+        return;
+      }
+
+      if (role == 'student') {
+        await SupabaseProfileService.ensureCurrentUserProfile();
+
+        if (!mounted) return;
+
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRouter.studentHome, (route) => false);
+        return;
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      await SupabaseAuthService.signOut();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Login successful, but your account is not registered as admin or student: $e',
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildEmailField() {
