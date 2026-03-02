@@ -16,7 +16,7 @@ Framework: Flutter (v3.0+)
 
 - Language: Dart
 
-- Backend: Firebase (Firestore for database, Storage for receipts, Auth for security)
+- Backend: Supabase (Supabase for database, Storage for receipts, Auth for security)
 
 - Scanning: mobile_scanner & qr_flutter
 
