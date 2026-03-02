@@ -33,6 +33,11 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Environment files (keep secrets out of git)
+.env
+.env.*
+!.env.example
+
 # Symbolication related
 app.*.symbols
 

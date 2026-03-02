@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/theme/app_theme.dart';
@@ -7,16 +8,18 @@ import 'routes/app_router.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Supabase.initialize(
-    url: const String.fromEnvironment(
-      'SUPABASE_URL',
-      defaultValue: 'https://iughctuvswasmttswwnk.supabase.co',
-    ),
-    anonKey: const String.fromEnvironment(
-      'SUPABASE_ANON_KEY',
-      defaultValue: 'sb_publishable_j7Wwu5oPpslcgsEftBSY9A_RegZBX5F',
-    ),
-  );
+  await dotenv.load(fileName: '.env');
+  final supabaseUrl = dotenv.env['SUPABASE_URL'];
+  final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'];
+
+  if (supabaseUrl == null ||
+      supabaseUrl.isEmpty ||
+      supabaseAnonKey == null ||
+      supabaseAnonKey.isEmpty) {
+    throw Exception('Missing SUPABASE_URL or SUPABASE_ANON_KEY in .env file.');
+  }
+
+  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
 
   runApp(const VouchMobileApp());
 }
