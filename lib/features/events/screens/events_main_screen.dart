@@ -17,11 +17,14 @@ const Color lightBlue = Color(0xFFE3F2FD);
 class EventsScreen extends StatefulWidget {
   final bool showChrome;
   final int initialTabIndex;
+  final void Function(BuildContext context, Map<String, dynamic> event)?
+  onViewDetailsTap;
 
   const EventsScreen({
     super.key,
     this.showChrome = true,
     this.initialTabIndex = 0,
+    this.onViewDetailsTap,
   });
 
   @override
@@ -356,6 +359,11 @@ class _EventsScreenState extends State<EventsScreen>
                       ),
                     ),
                     onPressed: () {
+                      if (widget.onViewDetailsTap != null) {
+                        widget.onViewDetailsTap!(context, event);
+                        return;
+                      }
+
                       Navigator.push(
                         context,
                         MaterialPageRoute(
