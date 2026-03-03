@@ -25,14 +25,14 @@ class QRScreen extends StatefulWidget {
   final String userAvatarPath;
 
   const QRScreen({
-    Key? key,
+    super.key,
     this.showChrome = true,
     this.userId = 'USER123',
     this.userName = 'Jeslito G. Geverola',
     this.userDegree = 'Bachelor of Science in Information Technology',
     this.userEmail = 'jeslito.geverola@dorsu.ed',
     this.userAvatarPath = 'assets/images/my_profile.png',
-  }) : super(key: key);
+  });
 
   @override
   State<QRScreen> createState() => _QRScreenState();

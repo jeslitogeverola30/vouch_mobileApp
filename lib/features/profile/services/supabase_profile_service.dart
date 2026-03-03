@@ -91,8 +91,8 @@ class SupabaseProfileService {
     final first = _readString(metadata['first_name']);
     final last = _readString(metadata['last_name']);
     final combined = [
-      if (first != null) first,
-      if (last != null) last,
+      ?first,
+      ?last,
     ].join(' ').trim();
 
     if (combined.isEmpty) {
