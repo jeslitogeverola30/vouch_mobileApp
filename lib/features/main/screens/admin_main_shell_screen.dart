@@ -41,6 +41,14 @@ class _AdminMainShellScreenState extends State<AdminMainShellScreen> {
             children: [
               AppMainHeader(
                 avatarPath: 'assets/logos/facet_logo.jpg',
+                onAvatarTap: () {
+                  if (_currentIndex == 4) {
+                    return;
+                  }
+                  setState(() {
+                    _currentIndex = 4;
+                  });
+                },
                 onSearchTap: () => openGlobalHeaderSearch(context),
               ),
               Expanded(

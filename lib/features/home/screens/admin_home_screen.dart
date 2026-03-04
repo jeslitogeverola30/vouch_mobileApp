@@ -206,6 +206,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         if (widget.showChrome)
           AppMainHeader(
             avatarPath: 'assets/logos/facet_logo.jpg',
+            onAvatarTap: () => _openAdminTab(4),
             onSearchTap: () => openGlobalHeaderSearch(context),
           ),
         Expanded(
