@@ -10,9 +10,14 @@ import '../../data/event_admin_service.dart';
 import '../../data/event_image_upload_service.dart';
 import '../../domain/event_creation_validators.dart';
 import '../../domain/event_date_time_formatters.dart';
+import '../../domain/event_form_initial_data.dart';
 
 class CreateEventScreen extends StatefulWidget {
-  const CreateEventScreen({super.key});
+  final EventFormInitialData? initialData;
+
+  const CreateEventScreen({super.key, this.initialData});
+
+  bool get isEditMode => initialData != null;
 
   @override
   State<CreateEventScreen> createState() => _CreateEventScreenState();
@@ -39,6 +44,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   bool _isLoadingImage = false;
   bool _isSubmitting = false;
   bool _isObligatory = false;
+  String _existingImageUrl = '';
 
   static const Color _royalBlue = Color(0xFF003DA5);
   static const Color _gold = Color(0xFFFFC107);
@@ -57,6 +63,40 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _timeOutController = TextEditingController();
     _shortDescController = TextEditingController();
     _fullDescController = TextEditingController();
+
+    _applyInitialData();
+  }
+
+  void _applyInitialData() {
+    final initialData = widget.initialData;
+    if (initialData == null) {
+      return;
+    }
+
+    _titleController.text = initialData.name;
+    _locationController.text = initialData.location;
+    _shortDescController.text = initialData.shortDescription;
+    _fullDescController.text = initialData.fullDescription;
+
+    _selectedEventDate = DateTime(
+      initialData.eventDate.year,
+      initialData.eventDate.month,
+      initialData.eventDate.day,
+    );
+    _eventDateController.text = _formatDate(_selectedEventDate!);
+
+    _timeInStart = _minutesToTimeOfDay(initialData.timeInStartMinutes);
+    _timeInEnd = _minutesToTimeOfDay(initialData.timeInEndMinutes);
+    _timeOutStart = _minutesToTimeOfDay(initialData.timeOutStartMinutes);
+    _timeOutEnd = _minutesToTimeOfDay(initialData.timeOutEndMinutes);
+
+    _timeInController.text =
+        '${_formatTime(_timeInStart!)} - ${_formatTime(_timeInEnd!)}';
+    _timeOutController.text =
+        '${_formatTime(_timeOutStart!)} - ${_formatTime(_timeOutEnd!)}';
+
+    _isObligatory = initialData.isMandatory;
+    _existingImageUrl = initialData.imageUrl.trim();
   }
 
   @override
@@ -334,7 +374,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       return;
     }
 
-    if (_selectedImage == null) {
+    if (_selectedImage == null && _existingImageUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select an event banner'),
@@ -361,31 +401,64 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final imageUrl = await EventImageUploadService.uploadEventImage(
-        imageFile: _selectedImage!,
-      );
+      var imageUrl = _existingImageUrl;
+      if (_selectedImage != null) {
+        imageUrl = await EventImageUploadService.uploadEventImage(
+          imageFile: _selectedImage!,
+        );
+      }
 
-      await EventAdminService.createEvent(
-        name: _titleController.text.trim(),
-        shortDescription: _shortDescController.text.trim(),
-        fullDescription: _fullDescController.text.trim(),
-        location: _locationController.text.trim(),
-        imageUrl: imageUrl,
-        eventDate: _selectedEventDate!,
-        timeInStartMinutes: _timeToMinutes(_timeInStart!),
-        timeInEndMinutes: _timeToMinutes(_timeInEnd!),
-        timeOutStartMinutes: _timeToMinutes(_timeOutStart!),
-        timeOutEndMinutes: _timeToMinutes(_timeOutEnd!),
-        isMandatory: _isObligatory,
-      );
+      if (imageUrl.trim().isEmpty) {
+        throw StateError('Please select an event banner');
+      }
+
+      if (widget.isEditMode) {
+        final eventId = widget.initialData?.eventId;
+        if (eventId == null) {
+          throw StateError('Unable to edit event. Missing event ID.');
+        }
+
+        await EventAdminService.updateEvent(
+          eventId: eventId,
+          name: _titleController.text.trim(),
+          shortDescription: _shortDescController.text.trim(),
+          fullDescription: _fullDescController.text.trim(),
+          location: _locationController.text.trim(),
+          imageUrl: imageUrl,
+          eventDate: _selectedEventDate!,
+          timeInStartMinutes: _timeToMinutes(_timeInStart!),
+          timeInEndMinutes: _timeToMinutes(_timeInEnd!),
+          timeOutStartMinutes: _timeToMinutes(_timeOutStart!),
+          timeOutEndMinutes: _timeToMinutes(_timeOutEnd!),
+          isMandatory: _isObligatory,
+        );
+      } else {
+        await EventAdminService.createEvent(
+          name: _titleController.text.trim(),
+          shortDescription: _shortDescController.text.trim(),
+          fullDescription: _fullDescController.text.trim(),
+          location: _locationController.text.trim(),
+          imageUrl: imageUrl,
+          eventDate: _selectedEventDate!,
+          timeInStartMinutes: _timeToMinutes(_timeInStart!),
+          timeInEndMinutes: _timeToMinutes(_timeInEnd!),
+          timeOutStartMinutes: _timeToMinutes(_timeOutStart!),
+          timeOutEndMinutes: _timeToMinutes(_timeOutEnd!),
+          isMandatory: _isObligatory,
+        );
+      }
 
       if (!mounted) {
         return;
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Event created successfully!'),
+        SnackBar(
+          content: Text(
+            widget.isEditMode
+                ? 'Event updated successfully!'
+                : 'Event created successfully!',
+          ),
           backgroundColor: Color(0xFF2E7D32),
         ),
       );
@@ -425,6 +498,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       final raw = error.toString();
       final message = raw.startsWith('Exception: ')
           ? raw.replaceFirst('Exception: ', '').trim()
+          : widget.isEditMode
+          ? 'Failed to update event. Please try again.'
           : 'Failed to create event. Please try again.';
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -488,8 +563,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                             children: [
                               _buildSectionHeader(
                                 title: 'Event Setup',
-                                subtitle:
-                                    'Enter event details and publishing settings',
+                                subtitle: widget.isEditMode
+                                    ? 'Update event details and publishing settings'
+                                    : 'Enter event details and publishing settings',
                               ),
                               const SizedBox(height: 12),
                               _buildFormCard(
@@ -589,7 +665,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'By creating this event, it becomes visible to eligible students in the DOrSU system.',
+                                widget.isEditMode
+                                    ? 'By updating this event, changes are reflected to all eligible students in the DOrSU system.'
+                                    : 'By creating this event, it becomes visible to eligible students in the DOrSU system.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: _mutedText.withOpacity(0.9),
@@ -638,12 +716,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
                 ),
-                children: const [
+                children: [
                   TextSpan(
-                    text: 'Create New ',
-                    style: TextStyle(color: _royalBlue),
+                    text: widget.isEditMode ? 'Edit ' : 'Create New ',
+                    style: const TextStyle(color: _royalBlue),
                   ),
-                  TextSpan(
+                  const TextSpan(
                     text: 'Event',
                     style: TextStyle(color: _gold),
                   ),
@@ -922,7 +1000,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   Widget _buildBannerPicker() {
-    if (_selectedImage == null) {
+    if (_selectedImage == null && _existingImageUrl.isEmpty) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
@@ -984,6 +1062,54 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_selectedImage == null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: _fieldFill,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _fieldBorder),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.network(
+                _existingImageUrl,
+                height: 185,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    height: 185,
+                    width: double.infinity,
+                    color: _fieldFill,
+                    child: const Icon(
+                      Ionicons.image,
+                      color: _mutedText,
+                      size: 32,
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton.icon(
+              onPressed: _isLoadingImage ? null : _pickImage,
+              icon: const Icon(Ionicons.refresh_outline, size: 16),
+              label: const Text('Change image'),
+              style: TextButton.styleFrom(
+                foregroundColor: _royalBlue,
+                textStyle: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -1103,9 +1229,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       color: Colors.white,
                     ),
                   )
-                : const Text(
-                    'Create Event',
-                    style: TextStyle(
+                : Text(
+                    widget.isEditMode ? 'Save Changes' : 'Create Event',
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.3,
@@ -1122,14 +1248,26 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   String _formatTime(TimeOfDay value) {
-    final localizations = MaterialLocalizations.of(context);
-    return localizations.formatTimeOfDay(value, alwaysUse24HourFormat: false);
+    final hour24 = value.hour;
+    final minuteText = value.minute.toString().padLeft(2, '0');
+    final period = hour24 >= 12 ? 'PM' : 'AM';
+    final hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
+
+    return '$hour12:$minuteText $period';
   }
 
   int _timeToMinutes(TimeOfDay value) {
     return EventCreationValidators.timeToMinutes(
       hour: value.hour,
       minute: value.minute,
+    );
+  }
+
+  TimeOfDay _minutesToTimeOfDay(int minutes) {
+    final normalizedMinutes = ((minutes % (24 * 60)) + (24 * 60)) % (24 * 60);
+    return TimeOfDay(
+      hour: normalizedMinutes ~/ 60,
+      minute: normalizedMinutes % 60,
     );
   }
 }

@@ -442,8 +442,10 @@ class _EventsScreenState extends State<EventsScreen>
                                 event['location'] as String? ??
                                 'University Campus',
                             locationSubtitle:
-                                event['locationSubtitle'] as String? ??
-                                'Davao Oriental State University',
+                                event['locationSubtitle'] as String? ?? '',
+                            shortDescription:
+                                event['shortDescription'] as String? ??
+                                'No short description available for this event.',
                             description:
                                 event['description'] as String? ??
                                 'No description available for this event.',

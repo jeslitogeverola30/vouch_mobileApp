@@ -31,15 +31,29 @@ class SupabaseProfileRepositoryImpl implements ProfileRepository {
     final faculty = _readString(metadata['faculty']) ?? 'N/A';
     final program = _readString(metadata['program']) ?? 'N/A';
 
+    final existingRow = await _client
+        .from(_table)
+        .select('profile_photo_url, account_status, password_hash')
+        .eq('email', email)
+        .maybeSingle();
+
+    final existingProfilePhotoUrl = _readString(
+      existingRow?['profile_photo_url'],
+    );
+    final existingAccountStatus =
+        _readString(existingRow?['account_status']) ?? 'active';
+    final existingPasswordHash =
+        _readString(existingRow?['password_hash']) ?? 'supabase_auth_managed';
+
     await _client.from(_table).upsert({
       'student_id': studentId,
       'email': email,
       'full_name': fullName,
       'faculty': faculty,
       'program': program,
-      'password_hash': 'supabase_auth_managed',
-      'profile_photo_url': '',
-      'account_status': 'active',
+      'password_hash': existingPasswordHash,
+      'profile_photo_url': existingProfilePhotoUrl ?? '',
+      'account_status': existingAccountStatus,
     }, onConflict: 'email');
   }
 

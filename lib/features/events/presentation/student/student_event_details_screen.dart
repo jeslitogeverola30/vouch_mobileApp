@@ -9,6 +9,7 @@ class EventDetailsScreen extends StatelessWidget {
   final String eventTime;
   final String location;
   final String locationSubtitle;
+  final String shortDescription;
   final String description;
   final bool isObligatory;
 
@@ -20,7 +21,8 @@ class EventDetailsScreen extends StatelessWidget {
     this.eventTime =
         'Time in: 08:00 AM - 08:15 AM\nTime out: 04:00 PM - 04:15 PM',
     this.location = 'University Campus',
-    this.locationSubtitle = 'Davao Oriental State University',
+    this.locationSubtitle = '',
+    this.shortDescription = 'No short description available for this event.',
     this.description =
         'Join us for SIGLAKAS 2025, the much-awaited annual sports fest that unites Carolinians through friendly competition, teamwork, and the true spirit of sportsmanship. For one exhilarating week, students from different colleges – Engineering, Business, Architecture, Arts and Sciences, Education, and Nursing – will compete across various sports and recreational activities. SIGLAKAS is more than just a tournament — it\'s a celebration of unity, discipline, and pride as students push their limits on and off the field. The event aims to promote physical wellness, camaraderie, and school spirit while reminding everyone that victory is not only about winning medals but about playing with heart.',
     this.isObligatory = true,
@@ -95,6 +97,26 @@ class EventDetailsScreen extends StatelessWidget {
                               title: location,
                               subtitle: locationSubtitle,
                               subtitleColor: lightGray,
+                            ),
+                            const SizedBox(height: 20),
+                            Text(
+                              'Short Description',
+                              style: GoogleFonts.poppins(
+                                color: royalBlue,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              shortDescription,
+                              textAlign: TextAlign.justify,
+                              style: GoogleFonts.poppins(
+                                color: Colors.black87,
+                                fontSize: 14,
+                                height: 1.55,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                             const SizedBox(height: 20),
                             Text(
@@ -276,6 +298,8 @@ class EventDetailsScreen extends StatelessWidget {
     required String subtitle,
     required Color subtitleColor,
   }) {
+    final hasSubtitle = subtitle.trim().isNotEmpty;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -314,15 +338,17 @@ class EventDetailsScreen extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.poppins(
-                    color: subtitleColor,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
+                if (hasSubtitle) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.poppins(
+                      color: subtitleColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

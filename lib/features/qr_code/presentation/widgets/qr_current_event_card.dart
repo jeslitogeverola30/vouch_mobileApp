@@ -39,6 +39,8 @@ class QrCurrentEventCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   event.eventName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Color(0xFF003DA5),
                     fontSize: 18,
@@ -81,9 +83,13 @@ class QrCurrentEventCard extends StatelessWidget {
                 color: Colors.black54,
               ),
               const SizedBox(width: 6),
-              Text(
-                event.location,
-                style: const TextStyle(color: Colors.black54, fontSize: 12),
+              Expanded(
+                child: Text(
+                  event.location,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.black54, fontSize: 12),
+                ),
               ),
             ],
           ),
@@ -96,12 +102,17 @@ class QrCurrentEventCard extends StatelessWidget {
                 color: Colors.black54,
               ),
               const SizedBox(width: 6),
-              Text(
-                event.timeWindow,
-                style: const TextStyle(
-                  color: Color(0xFF003DA5),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                child: Text(
+                  event.timeWindow,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF003DA5),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
                 ),
               ),
             ],

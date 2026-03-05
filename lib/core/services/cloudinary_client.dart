@@ -5,18 +5,25 @@ class CloudinaryClient {
 
   static String? get cloudName => _normalizedEnv('CLOUDINARY_CLOUD_NAME');
   static String? get uploadPreset => _normalizedEnv('CLOUDINARY_UPLOAD_PRESET');
+  static String? get profileUploadPreset =>
+      _normalizedEnv('CLOUDINARY_PROFILE_UPLOAD_PRESET');
 
-  static bool get isConfigured =>
-      cloudName != null &&
-      cloudName!.isNotEmpty &&
-      uploadPreset != null &&
-      uploadPreset!.isNotEmpty;
+  static bool get isCloudConfigured =>
+      cloudName != null && cloudName!.isNotEmpty;
+
+  static bool get isEventUploadConfigured =>
+      isCloudConfigured && uploadPreset != null && uploadPreset!.isNotEmpty;
+
+  static bool get isProfileUploadConfigured =>
+      isCloudConfigured &&
+      profileUploadPreset != null &&
+      profileUploadPreset!.isNotEmpty;
+
+  static bool get isConfigured => isEventUploadConfigured;
 
   static Uri get imageUploadUri {
-    if (!isConfigured) {
-      throw StateError(
-        'Missing CLOUDINARY_CLOUD_NAME or CLOUDINARY_UPLOAD_PRESET in .env file.',
-      );
+    if (!isCloudConfigured) {
+      throw StateError('Missing CLOUDINARY_CLOUD_NAME in .env file.');
     }
 
     return Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/upload');

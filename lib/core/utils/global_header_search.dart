@@ -42,6 +42,9 @@ Future<void> openGlobalHeaderSearch(BuildContext context) async {
         eventTime:
             'Time in: ${selectedEvent['timeIn'] ?? 'Time-in not available'}\n'
             'Time out: ${selectedEvent['timeOut'] ?? 'Time-out not available'}',
+        shortDescription:
+            selectedEvent['description'] ??
+            'No short description available for this event.',
         description:
             selectedEvent['description'] ??
             'No description available for this event.',

@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
 
+import '../../../../core/services/avatar_sync_service.dart';
 import '../../../../core/utils/global_header_search.dart';
 import '../../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../../core/widgets/app_main_header.dart';
 import '../../../../core/config/app_router.dart';
+import '../../../auth/data/supabase_auth_service.dart';
 import '../../data/qr_student_profile_repository_impl.dart';
 import '../../domain/qr_student_profile_entity.dart';
 import '../../domain/qr_utils.dart';
@@ -45,6 +47,7 @@ class _QRScreenState extends State<QRScreen> {
   late String _fullName;
   late String _faculty;
   late String _program;
+  String _avatarUrl = '';
   bool _isLoadingProfile = true;
   int _selectedNavIndex = 2;
 
@@ -55,6 +58,13 @@ class _QRScreenState extends State<QRScreen> {
     _fullName = widget.userName;
     _faculty = 'N/A';
     _program = widget.userDegree;
+
+    final syncedAvatar = AvatarSyncService.notifier.value;
+    if (syncedAvatar.email == _normalizedCurrentEmail() &&
+        syncedAvatar.avatarUrl != null) {
+      _avatarUrl = syncedAvatar.avatarUrl!;
+    }
+
     qrData = _generateQRData(
       studentId: _studentId,
       fullName: _fullName,
@@ -85,6 +95,9 @@ class _QRScreenState extends State<QRScreen> {
       _fullName = profile.fullName.isNotEmpty ? profile.fullName : _fullName;
       _faculty = profile.faculty.isNotEmpty ? profile.faculty : _faculty;
       _program = profile.program.isNotEmpty ? profile.program : _program;
+      _avatarUrl = profile.profilePhotoUrl.isNotEmpty
+          ? profile.profilePhotoUrl
+          : _avatarUrl;
       qrData = _generateQRData(
         studentId: _studentId,
         fullName: _fullName,
@@ -93,6 +106,13 @@ class _QRScreenState extends State<QRScreen> {
       );
       _isLoadingProfile = false;
     });
+
+    AvatarSyncService.setAvatar(
+      email: profile.email.isNotEmpty
+          ? profile.email
+          : SupabaseAuthService.currentUser?.email ?? widget.userEmail,
+      avatarUrl: _avatarUrl,
+    );
   }
 
   Future<QrStudentProfileEntity?> _safeGetCurrentProfile() async {
@@ -124,6 +144,16 @@ class _QRScreenState extends State<QRScreen> {
         duration: Duration(seconds: 2),
       ),
     );
+  }
+
+  String? _normalizedCurrentEmail() {
+    final email = (SupabaseAuthService.currentUser?.email ?? widget.userEmail)
+        .trim();
+    if (email.isEmpty) {
+      return null;
+    }
+
+    return email.toLowerCase();
   }
 
   @override
@@ -213,6 +243,7 @@ class _QRScreenState extends State<QRScreen> {
         if (widget.showChrome)
           AppMainHeader(
             avatarPath: widget.userAvatarPath,
+            avatarUrl: _avatarUrl,
             onSearchTap: () => openGlobalHeaderSearch(context),
           ),
         Expanded(
@@ -223,6 +254,7 @@ class _QRScreenState extends State<QRScreen> {
               children: [
                 StudentQrContentCard(
                   userAvatarPath: widget.userAvatarPath,
+                  avatarUrl: _avatarUrl,
                   fullName: _fullName,
                   studentId: _studentId,
                   isLoadingProfile: _isLoadingProfile,

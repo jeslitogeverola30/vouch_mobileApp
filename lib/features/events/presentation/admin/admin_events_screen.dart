@@ -10,6 +10,7 @@ import '../../data/event_query_service.dart';
 import '../../data/event_seed_data.dart';
 import '../../domain/event_date_time_formatters.dart';
 import 'admin_create_event_screen.dart';
+import 'admin_event_details_screen.dart';
 
 const Color royalBlue = Color(0xFF003DA5);
 const Color gold = Color(0xFFFFC107);
@@ -227,7 +228,9 @@ class _EventsScreenState extends State<AdminEventsScreen>
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
-        children: todayEvents.map(_buildUpcomingEventCard).toList(),
+        children: todayEvents
+            .map((event) => _buildUpcomingEventCard(event, isTodayEvent: true))
+            .toList(),
       ),
     );
   }
@@ -241,13 +244,16 @@ class _EventsScreenState extends State<AdminEventsScreen>
       padding: const EdgeInsets.all(16),
       child: Column(
         children: upcomingEvents
-            .map((event) => _buildUpcomingEventCard(event))
+            .map((event) => _buildUpcomingEventCard(event, isTodayEvent: false))
             .toList(),
       ),
     );
   }
 
-  Widget _buildUpcomingEventCard(Map<String, dynamic> event) {
+  Widget _buildUpcomingEventCard(
+    Map<String, dynamic> event, {
+    required bool isTodayEvent,
+  }) {
     final imagePath =
         event['image'] as String? ?? 'assets/images/event-siglakas.jpg';
 
@@ -411,40 +417,60 @@ class _EventsScreenState extends State<AdminEventsScreen>
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    onPressed: () {
+                    onPressed: () async {
                       if (widget.onViewDetailsTap != null) {
                         widget.onViewDetailsTap!(context, event);
                         return;
                       }
 
-                      Navigator.pushNamed(
+                      final changed = await Navigator.push<bool>(
                         context,
-                        AppRouter.adminEventDetails,
-                        arguments: {
-                          'eventImage':
-                              event['image'] as String? ??
-                              'assets/images/event-siglakas.jpg',
-                          'eventName': event['name'] as String? ?? 'Event',
-                          'eventDate':
-                              event['date'] as String? ?? 'Date not available',
-                          'eventTime':
-                              EventDateTimeFormatters.buildEventTimeText(
-                                timeIn: event['timeIn'] as String?,
-                                timeOut: event['timeOut'] as String?,
-                              ),
-                          'location':
-                              event['location'] as String? ??
-                              'University Campus',
-                          'locationSubtitle':
-                              event['locationSubtitle'] as String? ??
-                              'Davao Oriental State University',
-                          'description':
-                              event['description'] as String? ??
-                              'No description available for this event.',
-                          'isObligatory':
-                              event['isObligatory'] as bool? ?? false,
-                        },
+                        MaterialPageRoute(
+                          builder: (_) => AdminEventDetailsScreen(
+                            eventId: _readInt(event['id']),
+                            eventImage:
+                                event['image'] as String? ??
+                                'assets/images/event-siglakas.jpg',
+                            eventName: event['name'] as String? ?? 'Event',
+                            eventDate:
+                                event['date'] as String? ??
+                                'Date not available',
+                            eventTime:
+                                EventDateTimeFormatters.buildEventTimeText(
+                                  timeIn: event['timeIn'] as String?,
+                                  timeOut: event['timeOut'] as String?,
+                                ),
+                            location:
+                                event['location'] as String? ??
+                                'University Campus',
+                            locationSubtitle:
+                                event['locationSubtitle'] as String? ?? '',
+                            eventDateRaw:
+                                event['eventDateRaw'] as String? ?? '',
+                            timeInStartRaw:
+                                event['timeInStartRaw'] as String? ?? '',
+                            timeInEndRaw:
+                                event['timeInEndRaw'] as String? ?? '',
+                            timeOutStartRaw:
+                                event['timeOutStartRaw'] as String? ?? '',
+                            timeOutEndRaw:
+                                event['timeOutEndRaw'] as String? ?? '',
+                            shortDescription:
+                                event['shortDescription'] as String? ??
+                                'No short description available for this event.',
+                            description:
+                                event['description'] as String? ??
+                                'No description available for this event.',
+                            isObligatory:
+                                event['isObligatory'] as bool? ?? false,
+                            isTodayEvent: isTodayEvent,
+                          ),
+                        ),
                       );
+
+                      if (changed == true && mounted) {
+                        _refreshEvents();
+                      }
                     },
                     child: const Text(
                       'View Details',
@@ -920,5 +946,21 @@ class _EventsScreenState extends State<AdminEventsScreen>
         );
       },
     );
+  }
+
+  int? _readInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
+    }
+
+    if (value is String) {
+      return int.tryParse(value.trim());
+    }
+
+    return null;
   }
 }

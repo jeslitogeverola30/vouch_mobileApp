@@ -9,6 +9,7 @@ class StudentQrContentCard extends StatelessWidget {
   const StudentQrContentCard({
     super.key,
     required this.userAvatarPath,
+    this.avatarUrl,
     required this.fullName,
     required this.studentId,
     required this.isLoadingProfile,
@@ -18,6 +19,7 @@ class StudentQrContentCard extends StatelessWidget {
   });
 
   final String userAvatarPath;
+  final String? avatarUrl;
   final String fullName;
   final String studentId;
   final bool isLoadingProfile;
@@ -30,6 +32,40 @@ class StudentQrContentCard extends StatelessWidget {
   static const Color _white = Color(0xFFFFFFFF);
   static const Color _lightGray = Color(0xFFF5F5F5);
   static const Color _textGray = Color(0xFF666666);
+
+  Widget _buildAvatarImage() {
+    final normalizedAvatarUrl = avatarUrl?.trim() ?? '';
+
+    if (normalizedAvatarUrl.isNotEmpty) {
+      return Image.network(
+        normalizedAvatarUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Image.asset(
+            userAvatarPath,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                color: _lightGray,
+                child: const Icon(Ionicons.person, size: 30, color: _royalBlue),
+              );
+            },
+          );
+        },
+      );
+    }
+
+    return Image.asset(
+      userAvatarPath,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          color: _lightGray,
+          child: const Icon(Ionicons.person, size: 30, color: _royalBlue),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -113,22 +149,7 @@ class StudentQrContentCard extends StatelessWidget {
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2),
                     ),
-                    child: ClipOval(
-                      child: Image.asset(
-                        userAvatarPath,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: _lightGray,
-                            child: const Icon(
-                              Ionicons.person,
-                              size: 30,
-                              color: _royalBlue,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
+                    child: ClipOval(child: _buildAvatarImage()),
                   ),
                   const SizedBox(width: 10),
                   Expanded(

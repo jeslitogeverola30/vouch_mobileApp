@@ -44,6 +44,52 @@ class EventAdminService {
     });
   }
 
+  static Future<void> updateEvent({
+    required int eventId,
+    required String name,
+    required String shortDescription,
+    required String fullDescription,
+    required String location,
+    required String imageUrl,
+    required DateTime eventDate,
+    required int timeInStartMinutes,
+    required int timeInEndMinutes,
+    required int timeOutStartMinutes,
+    required int timeOutEndMinutes,
+    required bool isMandatory,
+  }) async {
+    await Supabase.instance.client
+        .from('events')
+        .update({
+          'name': name,
+          'short_description': shortDescription,
+          'full_description': fullDescription,
+          'location': location,
+          'image_url': imageUrl.trim(),
+          'event_date': EventDateTimeFormatters.databaseDate(eventDate),
+          'schedule_time_in_start':
+              EventDateTimeFormatters.databaseTimeFromMinutes(
+                timeInStartMinutes,
+              ),
+          'schedule_time_in_end':
+              EventDateTimeFormatters.databaseTimeFromMinutes(timeInEndMinutes),
+          'schedule_time_out_start':
+              EventDateTimeFormatters.databaseTimeFromMinutes(
+                timeOutStartMinutes,
+              ),
+          'schedule_time_out_end':
+              EventDateTimeFormatters.databaseTimeFromMinutes(
+                timeOutEndMinutes,
+              ),
+          'is_mandatory': isMandatory,
+        })
+        .eq('id', eventId);
+  }
+
+  static Future<void> deleteEvent({required int eventId}) async {
+    await Supabase.instance.client.from('events').delete().eq('id', eventId);
+  }
+
   static Future<int> _resolveCurrentAdminId() async {
     final email = SupabaseAuthService.currentUser?.email?.trim();
     if (email == null || email.isEmpty) {

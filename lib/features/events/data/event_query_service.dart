@@ -101,12 +101,20 @@ class EventQueryService {
         row['schedule_time_out_start'],
         row['schedule_time_out_end'],
       ),
+      'eventDateRaw': EventDateTimeFormatters.databaseDate(parsedDate),
+      'timeInStartRaw': _readString(row['schedule_time_in_start']),
+      'timeInEndRaw': _readString(row['schedule_time_in_end']),
+      'timeOutStartRaw': _readString(row['schedule_time_out_start']),
+      'timeOutEndRaw': _readString(row['schedule_time_out_end']),
       'image': imageUrl.isEmpty ? 'assets/images/event-siglakas.jpg' : imageUrl,
       'isObligatory': row['is_mandatory'] == true,
       'location': _readString(row['location']).isEmpty
           ? 'University Campus'
           : _readString(row['location']),
-      'locationSubtitle': 'Davao Oriental State University',
+      'locationSubtitle': '',
+      'shortDescription': shortDescription.isNotEmpty
+          ? shortDescription
+          : 'No short description available for this event.',
       'description': fullDescription.isNotEmpty
           ? fullDescription
           : (shortDescription.isNotEmpty

@@ -18,10 +18,12 @@ class QrStudentProfileRepositoryImpl implements QrStudentProfileRepository {
     }
 
     return QrStudentProfileEntity(
+      email: profile.email,
       studentId: profile.studentId,
       fullName: profile.fullName,
       faculty: profile.faculty,
       program: profile.program,
+      profilePhotoUrl: profile.profilePhotoUrl,
     );
   }
 }

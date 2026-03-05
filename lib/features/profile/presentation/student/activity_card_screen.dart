@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
 
 import '../../../../core/data/local/database_helper.dart';
+import '../../../../core/services/avatar_sync_service.dart';
 import '../../../auth/data/supabase_auth_service.dart';
 import '../../data/supabase_profile_repository_impl.dart';
 
@@ -20,6 +21,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
   String _studentName = 'Jeslito G. Geverola';
   String _studentProgram = 'BS - Information Technology';
   String _studentId = '2023-0222';
+  String _avatarUrl = '';
 
   static const _rowOneActivities = [
     //7 max items
@@ -48,6 +50,13 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
   @override
   void initState() {
     super.initState();
+
+    final syncedAvatar = AvatarSyncService.notifier.value;
+    if (syncedAvatar.email == _normalizedCurrentEmail() &&
+        syncedAvatar.avatarUrl != null) {
+      _avatarUrl = syncedAvatar.avatarUrl!;
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadStudentProfile();
     });
@@ -78,7 +87,49 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
       _studentProgram = (student['program'] as String? ?? _studentProgram)
           .trim();
       _studentId = (student['student_id'] as String? ?? _studentId).trim();
+      _avatarUrl = (student['profile_photo_url'] as String? ?? _avatarUrl)
+          .trim();
     });
+
+    AvatarSyncService.setAvatar(
+      email: (student['email'] as String?) ?? email,
+      avatarUrl: _avatarUrl,
+    );
+  }
+
+  String? _normalizedCurrentEmail() {
+    final email = SupabaseAuthService.currentUser?.email?.trim();
+    if (email == null || email.isEmpty) {
+      return null;
+    }
+
+    return email.toLowerCase();
+  }
+
+  Widget _buildStudentAvatarImage() {
+    if (_avatarUrl.isNotEmpty) {
+      return Image.network(
+        _avatarUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Image.asset(
+            'assets/images/my_profile.png',
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return const Icon(Ionicons.person, color: Colors.white, size: 63);
+            },
+          );
+        },
+      );
+    }
+
+    return Image.asset(
+      'assets/images/my_profile.png',
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return const Icon(Ionicons.person, color: Colors.white, size: 63);
+      },
+    );
   }
 
   @override
@@ -270,17 +321,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
                         width: 130,
                         height: 130,
                         color: royalBlue,
-                        child: Image.asset(
-                          'assets/images/my_profile.png',
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(
-                              Ionicons.person,
-                              color: Colors.white,
-                              size: 63,
-                            );
-                          },
-                        ),
+                        child: _buildStudentAvatarImage(),
                       ),
                     ),
                     const SizedBox(width: 15),

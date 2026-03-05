@@ -118,6 +118,7 @@ class AppRouter {
             : <String, dynamic>{};
         return MaterialPageRoute(
           builder: (_) => AdminEventDetailsScreen(
+            eventId: _readInt(args['eventId']),
             eventImage:
                 args['eventImage'] as String? ??
                 'assets/images/event-siglakas.jpg',
@@ -127,13 +128,20 @@ class AppRouter {
                 args['eventTime'] as String? ??
                 'Time in: Time-in not available\nTime out: Time-out not available',
             location: args['location'] as String? ?? 'University Campus',
-            locationSubtitle:
-                args['locationSubtitle'] as String? ??
-                'Davao Oriental State University',
+            locationSubtitle: args['locationSubtitle'] as String? ?? '',
+            eventDateRaw: args['eventDateRaw'] as String?,
+            timeInStartRaw: args['timeInStartRaw'] as String?,
+            timeInEndRaw: args['timeInEndRaw'] as String?,
+            timeOutStartRaw: args['timeOutStartRaw'] as String?,
+            timeOutEndRaw: args['timeOutEndRaw'] as String?,
+            shortDescription:
+                args['shortDescription'] as String? ??
+                'No short description available for this event.',
             description:
                 args['description'] as String? ??
                 'No description available for this event.',
             isObligatory: args['isObligatory'] as bool? ?? false,
+            isTodayEvent: args['isTodayEvent'] as bool? ?? false,
           ),
         );
       case adminEventRecord:
@@ -144,5 +152,17 @@ class AppRouter {
               const Scaffold(body: Center(child: Text('Route not found'))),
         );
     }
+  }
+
+  static int? _readInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is String) {
+      return int.tryParse(value.trim());
+    }
+
+    return null;
   }
 }

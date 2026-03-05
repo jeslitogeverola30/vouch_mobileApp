@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Vouch uses the camera to scan student QR codes for event attendance.</string>
 </dict>
 </plist>
