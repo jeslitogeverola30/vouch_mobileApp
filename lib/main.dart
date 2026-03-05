@@ -1,26 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/config/app_router.dart';
+import 'core/config/app_strings.dart';
+import 'core/services/supabase_client.dart';
 import 'core/theme/app_theme.dart';
-import 'features/auth/services/supabase_auth_service.dart';
-import 'routes/app_router.dart';
+import 'features/auth/data/supabase_auth_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await dotenv.load(fileName: '.env');
-  final supabaseUrl = dotenv.env['SUPABASE_URL'];
-  final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'];
-
-  if (supabaseUrl == null ||
-      supabaseUrl.isEmpty ||
-      supabaseAnonKey == null ||
-      supabaseAnonKey.isEmpty) {
-    throw Exception('Missing SUPABASE_URL or SUPABASE_ANON_KEY in .env file.');
-  }
-
-  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+  await SupabaseClientService.initialize();
 
   runApp(const VouchMobileApp());
 }
@@ -31,7 +20,7 @@ class VouchMobileApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Vouch Mobile App',
+      title: AppStrings.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       home: const _StartupGate(),

@@ -7,8 +7,8 @@ import 'dart:convert';
 import '../../../core/utils/global_header_search.dart';
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../core/widgets/app_main_header.dart';
-import '../../profile/services/supabase_profile_service.dart';
-import '../../../routes/app_router.dart';
+import '../../profile/data/supabase_profile_repository_impl.dart';
+import '../../../core/config/app_router.dart';
 
 const Color royalBlue = Color(0xFF003DA5);
 const Color gold = Color(0xFFFFC107);
@@ -67,7 +67,9 @@ class _QRScreenState extends State<QRScreen> {
     Map<String, dynamic>? profile;
 
     try {
-      profile = await SupabaseProfileService.getCurrentUserProfile();
+      profile =
+          (await SupabaseProfileRepositoryImpl.instance.getCurrentUserProfile())
+              ?.toMap();
     } catch (_) {
       profile = null;
     }
@@ -225,8 +227,6 @@ class _QRScreenState extends State<QRScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildIntroCard(),
-                const SizedBox(height: 20),
                 _buildQrContentCard(),
                 const SizedBox(height: 18),
                 Padding(
@@ -263,15 +263,16 @@ class _QRScreenState extends State<QRScreen> {
     );
   }
 
-  Widget _buildIntroCard() {
+  Widget _buildQrContentCard() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
+        width: double.infinity,
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: royalBlue.withOpacity(0.1)),
+          border: Border.all(color: royalBlue.withOpacity(0.12)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
@@ -283,61 +284,168 @@ class _QRScreenState extends State<QRScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            RichText(
-              text: TextSpan(
-                style: GoogleFonts.poppins(),
-                children: const [
-                  TextSpan(
-                    text: 'My ',
-                    style: TextStyle(
-                      color: royalBlue,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w700,
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: gold.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Ionicons.qr_code_outline,
+                    color: royalBlue,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'QR VERIFICATION',
+                        style: GoogleFonts.poppins(
+                          color: textGray,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Use this code for attendance and verification',
+                        style: GoogleFonts.poppins(
+                          color: textGray,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: royalBlue.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: royalBlue.withOpacity(0.12)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: ClipOval(
+                      child: Image.asset(
+                        widget.userAvatarPath,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: lightGray,
+                            child: const Icon(
+                              Ionicons.person,
+                              size: 30,
+                              color: royalBlue,
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
-                  TextSpan(
-                    text: 'QR ',
-                    style: TextStyle(
-                      color: gold,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  TextSpan(
-                    text: 'Code',
-                    style: TextStyle(
-                      color: gold,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w700,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _fullName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: royalBlue,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Student ID: $_studentId',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: textGray,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Present this code for attendance and student verification.',
-              style: GoogleFonts.poppins(
-                color: Colors.black54,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: lightGray,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: gold, width: 1.8),
+              ),
+              child: Center(
+                child: _isLoadingProfile
+                    ? const SizedBox(
+                        width: 220,
+                        height: 220,
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    : QrImageView(
+                        data: qrData,
+                        version: QrVersions.auto,
+                        size: 220,
+                        gapless: true,
+                        eyeStyle: const QrEyeStyle(
+                          eyeShape: QrEyeShape.square,
+                          color: royalBlue,
+                        ),
+                        dataModuleStyle: const QrDataModuleStyle(
+                          dataModuleShape: QrDataModuleShape.square,
+                          color: royalBlue,
+                        ),
+                        errorStateBuilder: (cxt, err) {
+                          return Container(
+                            width: 220,
+                            height: 220,
+                            color: lightGray,
+                            child: const Center(
+                              child: Text('Error generating QR'),
+                            ),
+                          );
+                        },
+                      ),
               ),
             ),
             const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: royalBlue.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                'Student ID: $_studentId',
-                style: GoogleFonts.poppins(
-                  color: royalBlue,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+            _buildQrMetaItem(
+              icon: Ionicons.school_outline,
+              label: 'Program',
+              value: _program,
+            ),
+            const SizedBox(height: 8),
+            _buildQrMetaItem(
+              icon: Ionicons.business_outline,
+              label: 'Faculty',
+              value: _faculty,
             ),
           ],
         ),
@@ -345,120 +453,45 @@ class _QRScreenState extends State<QRScreen> {
     );
   }
 
-  Widget _buildQrContentCard() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: royalBlue.withOpacity(0.1)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+  Widget _buildQrMetaItem({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: royalBlue.withOpacity(0.12)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: royalBlue.withOpacity(0.8), size: 16),
+          const SizedBox(width: 8),
+          Text(
+            '$label:',
+            style: GoogleFonts.poppins(
+              color: textGray,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
             ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 92,
-              height: 92,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 3),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: ClipOval(
-                child: Image.asset(
-                  widget.userAvatarPath,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: lightGray,
-                      child: const Icon(
-                        Ionicons.person,
-                        size: 42,
-                        color: royalBlue,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              _fullName,
-              textAlign: TextAlign.center,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              value,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
                 color: royalBlue,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _program,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
                 fontSize: 12,
-                color: textGray,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: gold, width: 2),
-              ),
-              child: _isLoadingProfile
-                  ? const SizedBox(
-                      width: 210,
-                      height: 210,
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  : QrImageView(
-                      data: qrData,
-                      version: QrVersions.auto,
-                      size: 210,
-                      gapless: true,
-                      errorStateBuilder: (cxt, err) {
-                        return Container(
-                          width: 210,
-                          height: 210,
-                          color: lightGray,
-                          child: const Center(
-                            child: Text('Error generating QR'),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Faculty: $_faculty',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: textGray,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

@@ -4,7 +4,7 @@ import 'package:ionicons/ionicons.dart';
 
 import '../../../core/utils/global_header_search.dart';
 import '../../../core/widgets/app_main_header.dart';
-import '../../../routes/app_router.dart';
+import '../../../core/config/app_router.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   final bool showChrome;
@@ -23,12 +23,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       'name': 'Panaghigalaay 2025',
       'description': 'Join us for a day of celebration',
       'date': 'March 05, 2026',
+      'timeIn': '08:00 AM - 08:15 AM',
+      'timeOut': '04:00 PM - 04:15 PM',
       'image': 'assets/images/panaghigalaay.jpg',
     },
     {
       'name': 'Buwan ng Wika 2025',
       'description': 'Show your love to Filipino',
       'date': 'March 12, 2026',
+      'timeIn': '08:00 AM - 08:15 AM',
+      'timeOut': '04:00 PM - 04:15 PM',
       'image': 'assets/images/buwan-ng-wika.jpg',
     },
   ];
@@ -292,7 +296,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
                 const SizedBox(height: 14),
                 SizedBox(
-                  height: 248,
+                  height: 286,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -300,7 +304,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     itemBuilder: (context, index) {
                       final event = todayEvents[index];
                       return Container(
-                        width: 224,
+                        width: 236,
                         margin: const EdgeInsets.only(right: 14),
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -325,53 +329,90 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                               ),
                               child: Image.asset(
                                 event['image']!,
-                                width: 224,
-                                height: 140,
+                                width: 236,
+                                height: 132,
                                 fit: BoxFit.cover,
                               ),
                             ),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(
-                                12,
-                                10,
-                                12,
-                                10,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    event['name']!,
-                                    style: const TextStyle(
-                                      color: Colors.black87,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  12,
+                                  8,
+                                  12,
+                                  8,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            event['name']!,
+                                            style: const TextStyle(
+                                              color: Color(0xFF003DA5),
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 7,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(
+                                              0xFFFFC107,
+                                            ).withOpacity(0.22),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'TODAY',
+                                            style: TextStyle(
+                                              color: Color(0xFF003DA5),
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 0.3,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    event['description']!,
-                                    style: const TextStyle(
-                                      color: Colors.black54,
-                                      fontSize: 11,
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      event['description']!,
+                                      style: const TextStyle(
+                                        color: Colors.black54,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    event['date']!,
-                                    style: const TextStyle(
-                                      color: Color(0xFF003DA5),
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
+                                    const SizedBox(height: 8),
+                                    _buildTodayEventInfoRow(
+                                      icon: Ionicons.calendar_outline,
+                                      text: event['date'] ?? '-',
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
+                                    const SizedBox(height: 6),
+                                    _buildTodayEventInfoRow(
+                                      icon: Ionicons.log_in_outline,
+                                      text: event['timeIn'] ?? '-',
+                                    ),
+                                    const SizedBox(height: 6),
+                                    _buildTodayEventInfoRow(
+                                      icon: Ionicons.log_out_outline,
+                                      text: event['timeOut'] ?? '-',
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
@@ -513,6 +554,38 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTodayEventInfoRow({
+    required IconData icon,
+    required String text,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF003DA5).withOpacity(0.06),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 13, color: const Color(0xFF003DA5)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF003DA5),
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

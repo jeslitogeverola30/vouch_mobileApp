@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
 
-import '../../routes/app_router.dart';
+import '../config/app_router.dart';
 
 class AppMainHeader extends StatelessWidget {
   final String avatarPath;

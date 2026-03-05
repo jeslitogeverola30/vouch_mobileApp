@@ -6,10 +6,10 @@ import '../../../core/data/local/database_helper.dart';
 import '../../../core/utils/global_header_search.dart';
 import '../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../core/widgets/app_main_header.dart';
-import '../../auth/services/supabase_auth_service.dart';
-import '../../events/screens/event_details_screen.dart';
-import '../../profile/services/supabase_profile_service.dart';
-import '../../../routes/app_router.dart';
+import '../../auth/data/supabase_auth_service.dart';
+import '../../events/presentation/student/student_event_details_screen.dart';
+import '../../profile/data/supabase_profile_repository_impl.dart';
+import '../../../core/config/app_router.dart';
 
 class StudentHomeScreen extends StatefulWidget {
   final bool showChrome;
@@ -62,7 +62,9 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
     Map<String, dynamic>? student;
 
     try {
-      student = await SupabaseProfileService.getCurrentUserProfile();
+      student =
+          (await SupabaseProfileRepositoryImpl.instance.getCurrentUserProfile())
+              ?.toMap();
     } catch (_) {
       student = null;
     }
@@ -431,7 +433,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
               Expanded(
                 child: _buildActionCard(
                   icon: Ionicons.star,
-                  label: 'Rate Event',
+                  label: 'Ratings',
                   onTap: _openRateEvent,
                 ),
               ),

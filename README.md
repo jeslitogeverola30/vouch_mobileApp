@@ -24,4 +24,5 @@ Framework: Flutter (v3.0+)
 
 - Create a local env file: `cp .env.example .env`
 - Fill in your own values for `SUPABASE_URL` and `SUPABASE_ANON_KEY`
+- Fill in Cloudinary values for `CLOUDINARY_CLOUD_NAME` and `CLOUDINARY_UPLOAD_PRESET` (use an unsigned upload preset)
 - `.env` is ignored by Git, so secrets are not pushed to GitHub

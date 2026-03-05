@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../features/events/screens/event_details_screen.dart';
+import '../../features/events/presentation/student/student_event_details_screen.dart';
 import '../../features/home/widgets/student_event_search_delegate.dart';
 
 const List<Map<String, String>> _globalSearchableEvents = [
