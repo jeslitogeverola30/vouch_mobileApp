@@ -6,10 +6,24 @@
 // tree, read text, and verify that the values of widget properties are correct.
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:vouch_mobileapp/main.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+
+    await Supabase.initialize(
+      url: 'https://example.supabase.co',
+      anonKey:
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhbm9uIjoidHJ1ZSJ9.signature',
+    );
+  });
+
   testWidgets('App widget builds', (WidgetTester tester) async {
     await tester.pumpWidget(const VouchMobileApp());
     expect(find.byType(VouchMobileApp), findsOneWidget);

@@ -1,0 +1,381 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+import '../data/supabase_auth_service.dart';
+
+class SensitiveReauthScreen extends StatefulWidget {
+  const SensitiveReauthScreen({super.key, required this.nextRoute});
+
+  final String nextRoute;
+
+  @override
+  State<SensitiveReauthScreen> createState() => _SensitiveReauthScreenState();
+}
+
+class _SensitiveReauthScreenState extends State<SensitiveReauthScreen> {
+  late final TextEditingController _passwordController;
+  bool _isSubmitting = false;
+  bool _obscurePassword = true;
+  String _currentEmail = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _passwordController = TextEditingController();
+    _currentEmail = SupabaseAuthService.currentUser?.email ?? '';
+  }
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _continueAfterReauth() async {
+    final currentPassword = _passwordController.text;
+
+    if (_currentEmail.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No signed-in user found.')));
+      return;
+    }
+
+    if (currentPassword.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter your current password.')),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      await SupabaseAuthService.signInWithPassword(
+        email: _currentEmail,
+        password: currentPassword,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _isSubmitting = false);
+
+    Navigator.of(context).pushReplacementNamed(widget.nextRoute);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme);
+
+    return Theme(
+      data: Theme.of(context).copyWith(textTheme: textTheme),
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: Stack(
+              children: [
+                Positioned(
+                  top: 70,
+                  right: -50,
+                  child: Container(
+                    width: 210,
+                    height: 210,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFC107).withOpacity(0.16),
+                      borderRadius: BorderRadius.circular(120),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 170,
+                  left: -30,
+                  child: Container(
+                    width: 160,
+                    height: 160,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF003DA5).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(90),
+                    ),
+                  ),
+                ),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final keyboardInset = MediaQuery.of(
+                      context,
+                    ).viewInsets.bottom;
+
+                    return AnimatedPadding(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOut,
+                      padding: EdgeInsets.fromLTRB(
+                        20,
+                        24,
+                        20,
+                        keyboardInset > 0 ? keyboardInset + 24 : 24,
+                      ),
+                      child: Align(
+                        alignment: Alignment.center,
+                        child: SingleChildScrollView(
+                          physics: const ClampingScrollPhysics(),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 420),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(24),
+                                border: Border.all(
+                                  color: const Color(
+                                    0xFF003DA5,
+                                  ).withOpacity(0.1),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.08),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  24,
+                                  24,
+                                  24,
+                                  22,
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: IconButton(
+                                        onPressed: () =>
+                                            Navigator.of(context).pop(),
+                                        icon: const Icon(
+                                          Icons.arrow_back_ios_new_rounded,
+                                          color: Color(0xFF003DA5),
+                                          size: 20,
+                                        ),
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Image.asset(
+                                          'assets/logos/vouch_logo.png',
+                                          width: 44,
+                                          height: 44,
+                                          fit: BoxFit.contain,
+                                        ),
+                                        const SizedBox(width: 2),
+                                        RichText(
+                                          text: TextSpan(
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 30,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                            children: const [
+                                              TextSpan(
+                                                text: 'ou',
+                                                style: TextStyle(
+                                                  color: Color(0xFF003DA5),
+                                                ),
+                                              ),
+                                              TextSpan(
+                                                text: 'ch',
+                                                style: TextStyle(
+                                                  color: Color(0xFFFFC107),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'Reauthenticate',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w700,
+                                        color: const Color(0xFF003DA5),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'For sensitive changes, confirm your current password first.',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 13,
+                                        color: Colors.black54,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _currentEmail.isEmpty
+                                          ? 'Current account unavailable'
+                                          : _currentEmail,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 13,
+                                        color: const Color(0xFF003DA5),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 20),
+                                    TextField(
+                                      controller: _passwordController,
+                                      obscureText: _obscurePassword,
+                                      textInputAction: TextInputAction.done,
+                                      onSubmitted: (_) {
+                                        if (!_isSubmitting) {
+                                          _continueAfterReauth();
+                                        }
+                                      },
+                                      decoration: InputDecoration(
+                                        hintText: 'Current password',
+                                        hintStyle: GoogleFonts.poppins(
+                                          color: Colors.grey.shade500,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        filled: true,
+                                        fillColor: Colors.white,
+                                        suffixIcon: IconButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              _obscurePassword =
+                                                  !_obscurePassword;
+                                            });
+                                          },
+                                          icon: Icon(
+                                            _obscurePassword
+                                                ? Icons.visibility_off_outlined
+                                                : Icons.visibility_outlined,
+                                            color: const Color(0xFF003DA5),
+                                            size: 20,
+                                          ),
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: const Color(
+                                              0xFF003DA5,
+                                            ).withOpacity(0.15),
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: const Color(
+                                              0xFF003DA5,
+                                            ).withOpacity(0.15),
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                          borderSide: const BorderSide(
+                                            color: Color(0xFF003DA5),
+                                            width: 2,
+                                          ),
+                                        ),
+                                      ),
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 20),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      height: 52,
+                                      child: ElevatedButton(
+                                        onPressed: _isSubmitting
+                                            ? null
+                                            : _continueAfterReauth,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(
+                                            0xFFFFC107,
+                                          ),
+                                          foregroundColor: const Color(
+                                            0xFF003DA5,
+                                          ),
+                                          disabledBackgroundColor: const Color(
+                                            0xFFFFC107,
+                                          ).withOpacity(0.6),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                          ),
+                                          elevation: 0,
+                                        ),
+                                        child: _isSubmitting
+                                            ? const SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<
+                                                        Color
+                                                      >(Color(0xFF003DA5)),
+                                                ),
+                                              )
+                                            : Text(
+                                                'Continue',
+                                                style: GoogleFonts.poppins(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

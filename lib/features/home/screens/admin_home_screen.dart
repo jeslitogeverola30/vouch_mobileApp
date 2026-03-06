@@ -4,7 +4,10 @@ import 'package:ionicons/ionicons.dart';
 
 import '../../../core/utils/global_header_search.dart';
 import '../../../core/widgets/app_main_header.dart';
-import '../../../routes/app_router.dart';
+import '../../../core/config/app_router.dart';
+import '../../events/data/event_query_service.dart';
+import '../../events/domain/event_date_time_formatters.dart';
+import '../../events/presentation/admin/admin_event_details_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   final bool showChrome;
@@ -17,21 +20,40 @@ class AdminHomeScreen extends StatefulWidget {
 
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
   String? _pressedActionLabel;
+  bool _isLoadingTodayEvents = true;
 
-  final List<Map<String, String>> todayEvents = [
-    {
-      'name': 'Panaghigalaay 2025',
-      'description': 'Join us for a day of celebration',
-      'date': 'March 05, 2026',
-      'image': 'assets/images/panaghigalaay.jpg',
-    },
-    {
-      'name': 'Buwan ng Wika 2025',
-      'description': 'Show your love to Filipino',
-      'date': 'March 12, 2026',
-      'image': 'assets/images/buwan-ng-wika.jpg',
-    },
-  ];
+  List<Map<String, dynamic>> _todayEvents = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTodayEvents();
+  }
+
+  Future<void> _loadTodayEvents() async {
+    try {
+      final events = await EventQueryService.fetchEvents();
+      final todayEvents = EventQueryService.todayEvents(events);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _todayEvents = todayEvents;
+        _isLoadingTodayEvents = false;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _todayEvents = const [];
+        _isLoadingTodayEvents = false;
+      });
+    }
+  }
 
   void _openAdminTab(int index) {
     Navigator.pushReplacementNamed(
@@ -291,95 +313,214 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   subtitle: 'Track active events and attendance windows',
                 ),
                 const SizedBox(height: 14),
-                SizedBox(
-                  height: 248,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: todayEvents.length,
-                    itemBuilder: (context, index) {
-                      final event = todayEvents[index];
-                      return Container(
-                        width: 224,
-                        margin: const EdgeInsets.only(right: 14),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
+                if (_isLoadingTodayEvents)
+                  const SizedBox(
+                    height: 286,
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_todayEvents.isEmpty)
+                  const SizedBox(
+                    height: 286,
+                    child: Center(
+                      child: Text(
+                        'No events today',
+                        style: TextStyle(
+                          color: Colors.black54,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  SizedBox(
+                    height: 286,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: _todayEvents.length,
+                      itemBuilder: (context, index) {
+                        final event = _todayEvents[index];
+                        return InkWell(
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: const Color(0xFF003DA5).withOpacity(0.1),
+                          onTap: () async {
+                            final changed = await Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AdminEventDetailsScreen(
+                                  eventId: _readInt(event['id']),
+                                  eventImage:
+                                      event['image'] as String? ??
+                                      'assets/images/event-siglakas.jpg',
+                                  eventName:
+                                      event['name'] as String? ?? 'Event',
+                                  eventDate:
+                                      event['date'] as String? ??
+                                      'Date not available',
+                                  eventTime:
+                                      EventDateTimeFormatters.buildEventTimeText(
+                                        timeIn: event['timeIn'] as String?,
+                                        timeOut: event['timeOut'] as String?,
+                                      ),
+                                  location:
+                                      event['location'] as String? ??
+                                      'University Campus',
+                                  locationSubtitle:
+                                      event['locationSubtitle'] as String? ??
+                                      '',
+                                  eventDateRaw:
+                                      event['eventDateRaw'] as String? ?? '',
+                                  timeInStartRaw:
+                                      event['timeInStartRaw'] as String? ?? '',
+                                  timeInEndRaw:
+                                      event['timeInEndRaw'] as String? ?? '',
+                                  timeOutStartRaw:
+                                      event['timeOutStartRaw'] as String? ?? '',
+                                  timeOutEndRaw:
+                                      event['timeOutEndRaw'] as String? ?? '',
+                                  shortDescription:
+                                      event['shortDescription'] as String? ??
+                                      'No short description available for this event.',
+                                  description:
+                                      event['description'] as String? ??
+                                      'No description available for this event.',
+                                  isObligatory:
+                                      event['isObligatory'] as bool? ?? false,
+                                  isTodayEvent: true,
+                                ),
+                              ),
+                            );
+
+                            if (changed == true && mounted) {
+                              _loadTodayEvents();
+                            }
+                          },
+                          child: Container(
+                            width: 236,
+                            margin: const EdgeInsets.only(right: 14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: const Color(0xFF003DA5).withOpacity(0.1),
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(14),
+                                  ),
+                                  child: _buildEventImage(
+                                    event['image'] as String? ??
+                                        'assets/images/event-siglakas.jpg',
+                                    width: 236,
+                                    height: 132,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      12,
+                                      8,
+                                      12,
+                                      8,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                event['name'] as String? ??
+                                                    'Event',
+                                                style: const TextStyle(
+                                                  color: Color(0xFF003DA5),
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 7,
+                                                    vertical: 3,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: const Color(
+                                                  0xFFFFC107,
+                                                ).withOpacity(0.22),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: const Text(
+                                                'TODAY',
+                                                style: TextStyle(
+                                                  color: Color(0xFF003DA5),
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w700,
+                                                  letterSpacing: 0.3,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          event['shortDescription']
+                                                  as String? ??
+                                              'No short description available for this event.',
+                                          style: const TextStyle(
+                                            color: Colors.black54,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        _buildTodayEventInfoRow(
+                                          icon: Ionicons.calendar_outline,
+                                          text: event['date'] as String? ?? '-',
+                                        ),
+                                        const SizedBox(height: 6),
+                                        _buildTodayEventInfoRow(
+                                          icon: Ionicons.log_in_outline,
+                                          text:
+                                              event['timeIn'] as String? ?? '-',
+                                        ),
+                                        const SizedBox(height: 6),
+                                        _buildTodayEventInfoRow(
+                                          icon: Ionicons.log_out_outline,
+                                          text:
+                                              event['timeOut'] as String? ??
+                                              '-',
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            ClipRRect(
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(14),
-                              ),
-                              child: Image.asset(
-                                event['image']!,
-                                width: 224,
-                                height: 140,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(
-                                12,
-                                10,
-                                12,
-                                10,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    event['name']!,
-                                    style: const TextStyle(
-                                      color: Colors.black87,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    event['description']!,
-                                    style: const TextStyle(
-                                      color: Colors.black54,
-                                      fontSize: 11,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    event['date']!,
-                                    style: const TextStyle(
-                                      color: Color(0xFF003DA5),
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
-                ),
                 const SizedBox(height: 20),
                 _buildSectionHeader(
                   title: 'Quick Actions',
@@ -514,5 +655,93 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildTodayEventInfoRow({
+    required IconData icon,
+    required String text,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF003DA5).withOpacity(0.06),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 13, color: const Color(0xFF003DA5)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF003DA5),
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEventImage(
+    String imagePath, {
+    required double width,
+    required double height,
+  }) {
+    final isAssetImage = imagePath.startsWith('assets/');
+
+    if (isAssetImage) {
+      return Image.asset(
+        imagePath,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            width: width,
+            height: height,
+            color: const Color(0xFFF5F5F5),
+            child: const Icon(Ionicons.image, color: Color(0xFF666666)),
+          );
+        },
+      );
+    }
+
+    return Image.network(
+      imagePath,
+      width: width,
+      height: height,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          width: width,
+          height: height,
+          color: const Color(0xFFF5F5F5),
+          child: const Icon(Ionicons.image, color: Color(0xFF666666)),
+        );
+      },
+    );
+  }
+
+  int? _readInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
+    }
+
+    if (value is String) {
+      return int.tryParse(value.trim());
+    }
+
+    return null;
   }
 }

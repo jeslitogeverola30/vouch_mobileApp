@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../features/events/screens/event_details_screen.dart';
+import '../../features/events/presentation/student/student_event_details_screen.dart';
 import '../../features/home/widgets/student_event_search_delegate.dart';
 
 const List<Map<String, String>> _globalSearchableEvents = [
@@ -42,6 +42,9 @@ Future<void> openGlobalHeaderSearch(BuildContext context) async {
         eventTime:
             'Time in: ${selectedEvent['timeIn'] ?? 'Time-in not available'}\n'
             'Time out: ${selectedEvent['timeOut'] ?? 'Time-out not available'}',
+        shortDescription:
+            selectedEvent['description'] ??
+            'No short description available for this event.',
         description:
             selectedEvent['description'] ??
             'No description available for this event.',
