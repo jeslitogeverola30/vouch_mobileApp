@@ -10,6 +10,7 @@ import '../../auth/data/supabase_auth_service.dart';
 import '../../events/data/event_query_service.dart';
 import '../../events/domain/event_date_time_formatters.dart';
 import '../../events/presentation/student/student_event_details_screen.dart';
+import '../data/student_home_statistics_service.dart';
 import '../../profile/data/supabase_profile_repository_impl.dart';
 import '../../../core/config/app_router.dart';
 
@@ -27,6 +28,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
   String _studentName = 'Student';
   String? _pressedActionLabel;
   bool _isLoadingTodayEvents = true;
+  bool _isLoadingStatistics = true;
+
+  double _attendanceRate = 0;
+  int _upcomingEventsCount = 0;
 
   List<Map<String, dynamic>> _todayEvents = const [];
 
@@ -34,6 +39,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
   void initState() {
     super.initState();
     _loadTodayEvents();
+    _loadStatistics();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadStudentData();
     });
@@ -60,6 +66,32 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
       setState(() {
         _todayEvents = const [];
         _isLoadingTodayEvents = false;
+      });
+    }
+  }
+
+  Future<void> _loadStatistics() async {
+    try {
+      final stats = await StudentHomeStatisticsService.fetchStatistics();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _attendanceRate = stats.attendanceRate;
+        _upcomingEventsCount = stats.upcomingEventsCount;
+        _isLoadingStatistics = false;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _attendanceRate = 0;
+        _upcomingEventsCount = 0;
+        _isLoadingStatistics = false;
       });
     }
   }
@@ -257,22 +289,6 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
             const Text(
               'Have a great day ka-TATA',
               style: TextStyle(color: Colors.black54, fontSize: 14),
-            ),
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF003DA5).withOpacity(0.08),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '${_todayEvents.length} events lined up today',
-                style: const TextStyle(
-                  color: Color(0xFF003DA5),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
             ),
           ],
         ),
@@ -602,8 +618,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    '85%',
+                  Text(
+                    _isLoadingStatistics
+                        ? '...'
+                        : '${_formatAttendanceRate(_attendanceRate)}%',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 32,
@@ -641,8 +659,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    '7',
+                  Text(
+                    _isLoadingStatistics
+                        ? '...'
+                        : _formatCount(_upcomingEventsCount),
                     style: TextStyle(
                       color: Colors.black87,
                       fontSize: 32,
@@ -727,5 +747,24 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
         );
       },
     );
+  }
+
+  String _formatAttendanceRate(double value) {
+    final normalized = value.isNaN || value.isInfinite
+        ? 0.0
+        : value.clamp(0, 100);
+    final roundedToSingleDecimal = (normalized * 10).roundToDouble() / 10;
+
+    if (roundedToSingleDecimal == roundedToSingleDecimal.roundToDouble()) {
+      return roundedToSingleDecimal.toStringAsFixed(0);
+    }
+
+    return roundedToSingleDecimal.toStringAsFixed(1);
+  }
+
+  String _formatCount(int value) {
+    final sanitized = value < 0 ? 0 : value;
+    final digits = sanitized.toString();
+    return digits.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
   }
 }

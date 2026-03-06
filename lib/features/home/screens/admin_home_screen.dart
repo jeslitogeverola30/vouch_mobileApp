@@ -8,6 +8,7 @@ import '../../../core/config/app_router.dart';
 import '../../events/data/event_query_service.dart';
 import '../../events/domain/event_date_time_formatters.dart';
 import '../../events/presentation/admin/admin_event_details_screen.dart';
+import '../data/admin_home_statistics_service.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   final bool showChrome;
@@ -21,6 +22,10 @@ class AdminHomeScreen extends StatefulWidget {
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
   String? _pressedActionLabel;
   bool _isLoadingTodayEvents = true;
+  bool _isLoadingStatistics = true;
+
+  int _totalStudentsCount = 0;
+  int _upcomingEventsCount = 0;
 
   List<Map<String, dynamic>> _todayEvents = const [];
 
@@ -31,28 +36,44 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Future<void> _loadTodayEvents() async {
+    List<Map<String, dynamic>> events = const [];
+    int totalStudentsCount = 0;
+    int upcomingEventsCount = 0;
+
     try {
-      final events = await EventQueryService.fetchEvents();
-      final todayEvents = EventQueryService.todayEvents(events);
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _todayEvents = todayEvents;
-        _isLoadingTodayEvents = false;
-      });
+      events = await EventQueryService.fetchEvents();
+      upcomingEventsCount = EventQueryService.upcomingEvents(events).length;
     } catch (_) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _todayEvents = const [];
-        _isLoadingTodayEvents = false;
-      });
+      events = const [];
+      upcomingEventsCount = 0;
     }
+
+    try {
+      totalStudentsCount =
+          await AdminHomeStatisticsService.fetchTotalStudentsCount();
+    } catch (_) {
+      totalStudentsCount = 0;
+    }
+
+    try {
+      final supabaseUpcomingCount =
+          await AdminHomeStatisticsService.fetchUpcomingEventsCount();
+      upcomingEventsCount = supabaseUpcomingCount;
+    } catch (_) {}
+
+    final todayEvents = EventQueryService.todayEvents(events);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _todayEvents = todayEvents;
+      _totalStudentsCount = totalStudentsCount;
+      _upcomingEventsCount = upcomingEventsCount;
+      _isLoadingTodayEvents = false;
+      _isLoadingStatistics = false;
+    });
   }
 
   void _openAdminTab(int index) {
@@ -283,25 +304,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         const Text(
                           'Manage students, events, and collections efficiently',
                           style: TextStyle(color: Colors.black54, fontSize: 14),
-                        ),
-                        const SizedBox(height: 14),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF003DA5).withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Text(
-                            '3 approvals waiting for action',
-                            style: TextStyle(
-                              color: Color(0xFF003DA5),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
                         ),
                       ],
                     ),
@@ -582,7 +584,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                               ),
                             ],
                           ),
-                          child: const Column(
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
@@ -595,7 +597,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                               ),
                               SizedBox(height: 12),
                               Text(
-                                '1,256',
+                                _isLoadingStatistics
+                                    ? '...'
+                                    : _formatCount(_totalStudentsCount),
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 32,
@@ -621,7 +625,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                               ),
                             ],
                           ),
-                          child: const Column(
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
@@ -634,7 +638,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                               ),
                               SizedBox(height: 12),
                               Text(
-                                '7',
+                                _isLoadingStatistics
+                                    ? '...'
+                                    : _formatCount(_upcomingEventsCount),
                                 style: TextStyle(
                                   color: Colors.black87,
                                   fontSize: 32,
@@ -727,6 +733,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         );
       },
     );
+  }
+
+  String _formatCount(int value) {
+    final sanitized = value < 0 ? 0 : value;
+    final digits = sanitized.toString();
+    return digits.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
   }
 
   int? _readInt(dynamic value) {
