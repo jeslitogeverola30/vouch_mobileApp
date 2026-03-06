@@ -14,6 +14,7 @@ class StudentPaymentSeedData {
     StudentPaymentTab.pending,
     StudentPaymentTab.toPay,
     StudentPaymentTab.paid,
+    StudentPaymentTab.rejected,
   ];
 
   static final List<StudentPaymentItem> paymentItems = [

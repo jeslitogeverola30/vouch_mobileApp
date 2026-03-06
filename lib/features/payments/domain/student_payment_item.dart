@@ -4,6 +4,7 @@ class StudentPaymentStatus {
   static const String pending = 'Pending';
   static const String toPay = 'To Pay';
   static const String paid = 'Paid';
+  static const String rejected = 'Rejected';
 }
 
 class StudentPaymentTab {
@@ -13,6 +14,7 @@ class StudentPaymentTab {
   static const String pending = 'Pending';
   static const String toPay = 'To Pay';
   static const String paid = 'Paid';
+  static const String rejected = 'Rejected';
 }
 
 class StudentPaymentSummary {
@@ -28,6 +30,7 @@ class StudentPaymentSummary {
 }
 
 class StudentPaymentItem {
+  final int? requirementId;
   final String name;
   final String amount;
   final String dueDate;
@@ -35,8 +38,10 @@ class StudentPaymentItem {
   final String status;
   final String obligation;
   final String actionText;
+  final String rejectionNote;
 
   const StudentPaymentItem({
+    this.requirementId,
     required this.name,
     required this.amount,
     required this.dueDate,
@@ -44,5 +49,6 @@ class StudentPaymentItem {
     required this.status,
     required this.obligation,
     required this.actionText,
+    this.rejectionNote = '',
   });
 }

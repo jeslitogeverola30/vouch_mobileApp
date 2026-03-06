@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../data/admin_payment_submission_service.dart';
 import '../../data/admin_payment_seed_data.dart';
+import '../../data/payment_receiver_service.dart';
 import '../../domain/payment_submission.dart';
 import '../../domain/payment_submission_filters.dart';
+import 'admin_created_fees_screen.dart';
 import 'admin_create_fee_screen.dart';
 import 'admin_edit_receiver_screen.dart';
 
@@ -20,20 +24,192 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
   String _selectedFilter = PaymentSubmissionStatus.pending;
   String _selectedFeeType = PaymentSubmissionFilters.allFeeTypesLabel;
 
-  final PaymentReceiverReference _receiverReference =
+  PaymentReceiverReference _receiverReference =
       AdminPaymentSeedData.receiverReference;
-  final List<PaymentSubmission> _submissions = List<PaymentSubmission>.from(
-    AdminPaymentSeedData.submissions,
-  );
+  final List<PaymentSubmission> _submissions = <PaymentSubmission>[];
+  bool _isLoadingSubmissions = false;
+  bool _isApplyingSubmissionDecision = false;
+  String? _submissionErrorMessage;
 
   @override
   void initState() {
     super.initState();
+    _loadReceiverReference();
+    _loadSubmissions();
     _searchController.addListener(() {
       if (mounted) {
         setState(() {});
       }
     });
+  }
+
+  Future<void> _loadReceiverReference({bool showErrorMessage = false}) async {
+    try {
+      final receiver = await PaymentReceiverService.instance
+          .fetchActiveReceiver();
+      if (!mounted || receiver == null) {
+        return;
+      }
+
+      final nextName = receiver.name.trim().isNotEmpty
+          ? receiver.name.trim()
+          : _receiverReference.name;
+      final nextRole = receiver.position.trim().isNotEmpty
+          ? receiver.position.trim()
+          : _receiverReference.role;
+      final rawNumber = receiver.gcashNumber.trim().isNotEmpty
+          ? receiver.gcashNumber.trim()
+          : _receiverReference.number;
+
+      setState(() {
+        _receiverReference = PaymentReceiverReference(
+          name: nextName,
+          role: nextRole,
+          number: PaymentReceiverDetails.formatGcashNumber(rawNumber),
+        );
+      });
+    } on PostgrestException catch (error) {
+      if (!mounted || !showErrorMessage) {
+        return;
+      }
+
+      final message = error.message.trim().isNotEmpty
+          ? error.message.trim()
+          : 'Unable to load receiver details from the database.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.red.shade700),
+      );
+    } catch (_) {
+      if (!mounted || !showErrorMessage) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Unable to refresh receiver details right now. Please try again.',
+          ),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
+  Future<void> _loadSubmissions({bool showErrorMessage = false}) async {
+    setState(() {
+      _isLoadingSubmissions = true;
+      _submissionErrorMessage = null;
+    });
+
+    try {
+      final fetchedSubmissions = await AdminPaymentSubmissionService.instance
+          .fetchSubmissionsForCurrentAdmin();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _submissions
+          ..clear()
+          ..addAll(fetchedSubmissions);
+        _isLoadingSubmissions = false;
+        _submissionErrorMessage = null;
+
+        final isCurrentFeeTypeValid =
+            _selectedFeeType == PaymentSubmissionFilters.allFeeTypesLabel ||
+            _submissions.any(
+              (submission) => submission.courseName == _selectedFeeType,
+            );
+
+        if (!isCurrentFeeTypeValid) {
+          _selectedFeeType = PaymentSubmissionFilters.allFeeTypesLabel;
+        }
+      });
+    } on PostgrestException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      final message = _resolveSubmissionErrorMessage(error);
+
+      setState(() {
+        _submissions.clear();
+        _isLoadingSubmissions = false;
+        _submissionErrorMessage = message;
+        _selectedFeeType = PaymentSubmissionFilters.allFeeTypesLabel;
+      });
+
+      if (showErrorMessage) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } on StateError catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      final message = error.message.trim().isNotEmpty
+          ? error.message.trim()
+          : 'Unable to load student submissions right now.';
+
+      setState(() {
+        _submissions.clear();
+        _isLoadingSubmissions = false;
+        _submissionErrorMessage = message;
+        _selectedFeeType = PaymentSubmissionFilters.allFeeTypesLabel;
+      });
+
+      if (showErrorMessage) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      const message =
+          'Unable to load student submissions right now. Please try again.';
+
+      setState(() {
+        _submissions.clear();
+        _isLoadingSubmissions = false;
+        _submissionErrorMessage = message;
+        _selectedFeeType = PaymentSubmissionFilters.allFeeTypesLabel;
+      });
+
+      if (showErrorMessage) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(message),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
+
+  String _resolveSubmissionErrorMessage(PostgrestException error) {
+    final message = error.message.trim();
+    if (message.isNotEmpty) {
+      return message;
+    }
+
+    final code = error.code?.trim() ?? '';
+    if (code.isNotEmpty) {
+      return 'Supabase request failed ($code).';
+    }
+
+    return 'Unexpected database error while loading submissions.';
   }
 
   @override
@@ -66,55 +242,86 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
     }
   }
 
-  void _showApprovalDialog(PaymentSubmission submission, bool isApprove) {
+  Future<void> _showApprovalDialog(
+    PaymentSubmission submission,
+    bool isApprove,
+  ) async {
+    if (_isApplyingSubmissionDecision) {
+      return;
+    }
+
+    final decision = await showDialog<_SubmissionDecisionResult>(
+      context: context,
+      useRootNavigator: false,
+      builder: (_) => _SubmissionDecisionDialog(
+        submission: submission,
+        isApprove: isApprove,
+      ),
+    );
+
+    if (!mounted || decision == null) {
+      return;
+    }
+
+    await Future<void>.delayed(Duration.zero);
+
+    if (!mounted) {
+      return;
+    }
+
+    await _applySubmissionDecision(
+      submission: submission,
+      isApprove: decision.isApprove,
+      reviewNote: decision.reviewNote,
+    );
+  }
+
+  void _showRejectionNoteDialog({
+    required String note,
+    required String studentName,
+  }) {
+    final normalizedNote = note.trim();
+    if (normalizedNote.isEmpty) {
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
-        title: Text(
-          isApprove ? 'Approve Payment' : 'Reject Payment',
-          style: const TextStyle(
+        title: const Text(
+          'Rejection Note',
+          style: TextStyle(
             color: Color(0xFF003DA5),
             fontWeight: FontWeight.bold,
             fontSize: 18,
           ),
         ),
-        content: Text(
-          isApprove
-              ? 'Approve ₱${submission.amount} payment from ${submission.studentName}?'
-              : 'Reject ₱${submission.amount} payment from ${submission.studentName}?',
-          style: const TextStyle(color: Colors.black87, fontSize: 14),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Student: $studentName',
+              style: const TextStyle(
+                color: Color(0xFF003DA5),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              normalizedNote,
+              style: const TextStyle(color: Colors.black87, fontSize: 14),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text(
-              'Cancel',
+              'Close',
               style: TextStyle(color: Color(0xFF003DA5)),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isApprove ? const Color(0xFF003DA5) : Colors.red,
-            ),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    isApprove
-                        ? 'Payment approved successfully'
-                        : 'Payment rejected',
-                  ),
-                  backgroundColor: isApprove
-                      ? Colors.green
-                      : Colors.red.shade600,
-                ),
-              );
-              Navigator.pop(context);
-            },
-            child: Text(
-              isApprove ? 'Approve' : 'Reject',
-              style: const TextStyle(color: Colors.white),
             ),
           ),
         ],
@@ -122,7 +329,117 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
     );
   }
 
+  Future<void> _applySubmissionDecision({
+    required PaymentSubmission submission,
+    required bool isApprove,
+    String? reviewNote,
+  }) async {
+    if (_isApplyingSubmissionDecision) {
+      return;
+    }
+
+    final transactionId = int.tryParse(submission.id.trim());
+    if (transactionId == null || transactionId <= 0) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Invalid submission id. Please refresh and try again.',
+          ),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isApplyingSubmissionDecision = true);
+
+    try {
+      await AdminPaymentSubmissionService.instance.updateSubmissionStatus(
+        transactionId: transactionId,
+        isApproved: isApprove,
+        reviewNote: reviewNote,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      await _loadSubmissions(showErrorMessage: true);
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isApprove ? 'Payment approved successfully' : 'Payment rejected',
+          ),
+          backgroundColor: isApprove ? Colors.green : Colors.red.shade600,
+        ),
+      );
+    } on PostgrestException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_resolveSubmissionErrorMessage(error)),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } on ArgumentError catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message.toString()),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } on StateError catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Unable to update submission status right now. Please try again.',
+          ),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isApplyingSubmissionDecision = false);
+      }
+    }
+  }
+
   void _showReceiptPreview(PaymentSubmission submission) {
+    final receiptSource = submission.receiptAssetPath.trim();
+    final hasReceipt = receiptSource.isNotEmpty;
+    final isNetworkReceipt = _isNetworkReceiptPath(receiptSource);
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -189,24 +506,56 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
                     child: Container(
                       width: double.infinity,
                       color: const Color(0xFFEEF2FA),
-                      child: Image.asset(
-                        submission.receiptAssetPath,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const SizedBox(
-                            height: 280,
-                            child: Center(
-                              child: Text(
-                                'Receipt sample not found',
-                                style: TextStyle(
-                                  color: Colors.black54,
-                                  fontWeight: FontWeight.w600,
+                      child: !hasReceipt
+                          ? const SizedBox(
+                              height: 280,
+                              child: Center(
+                                child: Text(
+                                  'Receipt is not available',
+                                  style: TextStyle(
+                                    color: Colors.black54,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
+                            )
+                          : isNetworkReceipt
+                          ? Image.network(
+                              receiptSource,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const SizedBox(
+                                  height: 280,
+                                  child: Center(
+                                    child: Text(
+                                      'Unable to load receipt image',
+                                      style: TextStyle(
+                                        color: Colors.black54,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            )
+                          : Image.asset(
+                              receiptSource,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const SizedBox(
+                                  height: 280,
+                                  child: Center(
+                                    child: Text(
+                                      'Receipt sample not found',
+                                      style: TextStyle(
+                                        color: Colors.black54,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
                     ),
                   ),
                 ),
@@ -216,6 +565,15 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
         );
       },
     );
+  }
+
+  bool _isNetworkReceiptPath(String value) {
+    final uri = Uri.tryParse(value.trim());
+    if (uri == null) {
+      return false;
+    }
+
+    return uri.scheme == 'http' || uri.scheme == 'https';
   }
 
   Future<void> _showFeeTypePicker() async {
@@ -397,6 +755,11 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
   Widget build(BuildContext context) {
     final textTheme = GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme);
     final filteredSubmissions = _filteredSubmissions;
+    final submissionsSubtitle = _isLoadingSubmissions
+        ? 'Loading student submissions...'
+        : _submissionErrorMessage != null && _submissions.isEmpty
+        ? 'Unable to load student submissions'
+        : '${filteredSubmissions.length} result(s) in $_selectedFilter • ${_selectedFeeType == PaymentSubmissionFilters.allFeeTypesLabel ? 'all fees' : _selectedFeeType}';
 
     return Theme(
       data: Theme.of(context).copyWith(textTheme: textTheme),
@@ -436,10 +799,7 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
                   const SizedBox(height: 16),
                   _buildReceiverReferenceCard(),
                   const SizedBox(height: 24),
-                  _buildSectionHeader(
-                    title: 'Search & Filter',
-                    subtitle: 'Narrow down payment submissions quickly',
-                  ),
+                  _buildSearchAndFilterHeader(),
                   const SizedBox(height: 12),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -560,13 +920,16 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
                   const SizedBox(height: 24),
                   _buildSectionHeader(
                     title: 'Submissions',
-                    subtitle:
-                        '${filteredSubmissions.length} result(s) in $_selectedFilter • ${_selectedFeeType == PaymentSubmissionFilters.allFeeTypesLabel ? 'all fees' : _selectedFeeType}',
+                    subtitle: submissionsSubtitle,
                   ),
                   const SizedBox(height: 12),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: _buildSubmissionListPanel(filteredSubmissions),
+                    child: _buildSubmissionListPanel(
+                      submissions: filteredSubmissions,
+                      isLoading: _isLoadingSubmissions,
+                      errorMessage: _submissionErrorMessage,
+                    ),
                   ),
                 ],
               ),
@@ -576,9 +939,20 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
               bottom: 20,
               child: FloatingActionButton(
                 heroTag: 'admin_payments_add_fab',
-                onPressed: () {
-                  Navigator.of(context).push(
+                onPressed: () async {
+                  final didCreate = await Navigator.of(context).push<bool>(
                     MaterialPageRoute(builder: (_) => const CreateFeeScreen()),
+                  );
+
+                  if (!mounted || didCreate != true) {
+                    return;
+                  }
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Fee created successfully!'),
+                      backgroundColor: Color(0xFF2E7D32),
+                    ),
                   );
                 },
                 backgroundColor: const Color(0xFF003DA5),
@@ -626,6 +1000,71 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
     );
   }
 
+  Widget _buildSearchAndFilterHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Search & Filter',
+                  style: TextStyle(
+                    color: Color(0xFF003DA5),
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Narrow down payment submissions quickly',
+                  style: TextStyle(
+                    color: Colors.black.withOpacity(0.55),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          SizedBox(
+            height: 34,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const AdminCreatedFeesScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Ionicons.list_outline, size: 16),
+              label: const Text(
+                'See Created Fees',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF003DA5),
+                side: BorderSide(
+                  color: const Color(0xFF003DA5).withOpacity(0.25),
+                ),
+                visualDensity: VisualDensity.compact,
+                backgroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildReceiverReferenceCard() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -654,7 +1093,7 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 16, 20, 14),
+                padding: const EdgeInsets.fromLTRB(24, 16, 20, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -674,31 +1113,34 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
                                   letterSpacing: 0.4,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 5),
                               Text(
                                 _receiverReference.name,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.poppins(
                                   color: Colors.white,
-                                  fontSize: 24,
+                                  fontSize: 23,
                                   fontWeight: FontWeight.w700,
-                                  height: 1,
+                                  height: 1.05,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 5),
                               Text(
                                 _receiverReference.role,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.poppins(
                                   color: const Color(0xFFFFD54F),
-                                  fontSize: 16,
+                                  fontSize: 15,
                                   fontWeight: FontWeight.w700,
+                                  height: 1.1,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 10),
                         Container(
                           width: 54,
                           height: 54,
@@ -718,18 +1160,19 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const Spacer(),
                     Text(
                       'GCASH NUMBER',
                       style: GoogleFonts.poppins(
                         color: const Color(0xFFAFC0F1),
-                        fontSize: 14,
+                        fontSize: 13,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.4,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Expanded(
                           child: Text(
@@ -738,21 +1181,43 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.poppins(
                               color: const Color.fromARGB(255, 255, 255, 255),
-                              fontSize: 24,
+                              fontSize: 23,
                               fontWeight: FontWeight.w700,
-                              height: 1,
+                              height: 1.05,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 12),
                         SizedBox(
-                          height: 38,
+                          height: 36,
                           child: ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const EditReceiverDetailsScreen(),
+                            onPressed: () async {
+                              final didSave = await Navigator.of(context)
+                                  .push<bool>(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const EditReceiverDetailsScreen(),
+                                    ),
+                                  );
+
+                              if (!mounted || didSave != true) {
+                                return;
+                              }
+
+                              await _loadReceiverReference(
+                                showErrorMessage: true,
+                              );
+
+                              if (!mounted) {
+                                return;
+                              }
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Receiver details updated successfully',
+                                  ),
+                                  backgroundColor: Color(0xFF2E7D32),
                                 ),
                               );
                             },
@@ -789,7 +1254,11 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
     );
   }
 
-  Widget _buildSubmissionListPanel(List<PaymentSubmission> submissions) {
+  Widget _buildSubmissionListPanel({
+    required List<PaymentSubmission> submissions,
+    required bool isLoading,
+    String? errorMessage,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -805,7 +1274,11 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
           ),
         ],
       ),
-      child: submissions.isEmpty
+      child: isLoading
+          ? _buildSubmissionsLoadingState()
+          : errorMessage != null && _submissions.isEmpty
+          ? _buildSubmissionsErrorState(errorMessage)
+          : submissions.isEmpty
           ? _buildEmptyState(isEmbedded: true)
           : Column(
               children: List.generate(
@@ -818,6 +1291,81 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _buildSubmissionsLoadingState() {
+    return const SizedBox(
+      height: 160,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.4,
+                color: Color(0xFF003DA5),
+              ),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'Loading submissions...',
+              style: TextStyle(
+                color: Color(0xFF003DA5),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubmissionsErrorState(String message) {
+    return SizedBox(
+      width: double.infinity,
+      child: Column(
+        children: [
+          Icon(
+            Ionicons.alert_circle_outline,
+            color: const Color(0xFFC62828).withOpacity(0.9),
+            size: 26,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Failed to load submissions',
+            style: TextStyle(
+              color: Color(0xFF003DA5),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.black54, fontSize: 12),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => _loadSubmissions(showErrorMessage: true),
+            icon: const Icon(Ionicons.refresh_outline, size: 15),
+            label: const Text(
+              'Try Again',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF003DA5),
+              side: BorderSide(
+                color: const Color(0xFF003DA5).withOpacity(0.25),
+              ),
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -860,6 +1408,10 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
   Widget _buildSubmissionCard(PaymentSubmission submission) {
     final statusColor = _statusColor(submission.status);
     final isPending = submission.status == PaymentSubmissionStatus.pending;
+    final isRejected = submission.status == PaymentSubmissionStatus.rejected;
+    final hasRejectionNote = submission.rejectionNote.trim().isNotEmpty;
+    final isDecisionLocked = _isApplyingSubmissionDecision;
+    final hasReceipt = submission.receiptAssetPath.trim().isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -993,14 +1545,16 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
                   ),
                 ),
                 TextButton.icon(
-                  onPressed: () => _showReceiptPreview(submission),
+                  onPressed: hasReceipt
+                      ? () => _showReceiptPreview(submission)
+                      : null,
                   style: TextButton.styleFrom(
                     foregroundColor: const Color(0xFF003DA5),
                     visualDensity: VisualDensity.compact,
                   ),
                   icon: const Icon(Ionicons.eye_outline, size: 15),
-                  label: const Text(
-                    'View Receipt',
+                  label: Text(
+                    hasReceipt ? 'View Receipt' : 'No Receipt',
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
@@ -1013,7 +1567,9 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _showApprovalDialog(submission, false),
+                    onPressed: isDecisionLocked
+                        ? null
+                        : () => _showApprovalDialog(submission, false),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFC62828),
                       side: const BorderSide(color: Color(0xFFC62828)),
@@ -1032,10 +1588,13 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _showApprovalDialog(submission, true),
+                    onPressed: isDecisionLocked
+                        ? null
+                        : () => _showApprovalDialog(submission, true),
                     style: ElevatedButton.styleFrom(
                       elevation: 0,
                       backgroundColor: const Color(0xFF003DA5),
+                      disabledBackgroundColor: const Color(0xFF6B7280),
                       padding: const EdgeInsets.symmetric(vertical: 11),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -1084,6 +1643,24 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  if (isRejected && hasRejectionNote) ...[
+                    const SizedBox(width: 6),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => _showRejectionNoteDialog(
+                        note: submission.rejectionNote,
+                        studentName: submission.studentName,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(
+                          Ionicons.document_text_outline,
+                          color: statusColor,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1122,6 +1699,138 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SubmissionDecisionResult {
+  final bool isApprove;
+  final String? reviewNote;
+
+  const _SubmissionDecisionResult({
+    required this.isApprove,
+    required this.reviewNote,
+  });
+}
+
+class _SubmissionDecisionDialog extends StatefulWidget {
+  final PaymentSubmission submission;
+  final bool isApprove;
+
+  const _SubmissionDecisionDialog({
+    required this.submission,
+    required this.isApprove,
+  });
+
+  @override
+  State<_SubmissionDecisionDialog> createState() =>
+      _SubmissionDecisionDialogState();
+}
+
+class _SubmissionDecisionDialogState extends State<_SubmissionDecisionDialog> {
+  final TextEditingController _noteController = TextEditingController();
+  String? _validationMessage;
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: Colors.white,
+      title: Text(
+        widget.isApprove ? 'Approve Payment' : 'Reject Payment',
+        style: const TextStyle(
+          color: Color(0xFF003DA5),
+          fontWeight: FontWeight.bold,
+          fontSize: 18,
+        ),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.isApprove
+                ? 'Approve ₱${widget.submission.amount} payment from ${widget.submission.studentName}?'
+                : 'Reject ₱${widget.submission.amount} payment from ${widget.submission.studentName}?',
+            style: const TextStyle(color: Colors.black87, fontSize: 14),
+          ),
+          if (!widget.isApprove) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _noteController,
+              minLines: 2,
+              maxLines: 4,
+              textInputAction: TextInputAction.newline,
+              onChanged: (_) {
+                if (_validationMessage == null) {
+                  return;
+                }
+
+                setState(() => _validationMessage = null);
+              },
+              decoration: InputDecoration(
+                labelText: 'Rejection Note',
+                hintText: 'Enter why this submission is rejected',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            if (_validationMessage != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _validationMessage!,
+                style: const TextStyle(
+                  color: Color(0xFFC62828),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text(
+            'Cancel',
+            style: TextStyle(color: Color(0xFF003DA5)),
+          ),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: widget.isApprove
+                ? const Color(0xFF003DA5)
+                : Colors.red,
+          ),
+          onPressed: () {
+            final reviewNote = _noteController.text.trim();
+            if (!widget.isApprove && reviewNote.isEmpty) {
+              setState(
+                () => _validationMessage = 'Rejection note is required.',
+              );
+              return;
+            }
+
+            Navigator.of(context).pop(
+              _SubmissionDecisionResult(
+                isApprove: widget.isApprove,
+                reviewNote: widget.isApprove ? null : reviewNote,
+              ),
+            );
+          },
+          child: Text(
+            widget.isApprove ? 'Approve' : 'Reject',
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../data/payment_receiver_service.dart';
 import '../../domain/payment_form_validators.dart';
 
 class EditReceiverDetailsScreen extends StatefulWidget {
@@ -20,7 +22,9 @@ class _EditReceiverDetailsScreenState extends State<EditReceiverDetailsScreen> {
   late final TextEditingController _positionController;
   late final TextEditingController _gcashNumberController;
 
+  String _editingReceiverId = PaymentReceiverService.defaultReceiverId;
   bool _isLoading = false;
+  bool _isFetchingReceiver = false;
 
   static const Color _royalBlue = Color(0xFF003DA5);
   static const Color _gold = Color(0xFFFFC107);
@@ -29,12 +33,17 @@ class _EditReceiverDetailsScreenState extends State<EditReceiverDetailsScreen> {
   static const Color _mutedText = Color(0xFF6B7280);
   static const Color _titleText = Color(0xFF1F2937);
 
+  static const String _defaultAccountName = 'Juan Dela Cruz';
+  static const String _defaultPosition = 'USC Treasurer';
+  static const String _defaultGcashNumber = '09123456789';
+
   @override
   void initState() {
     super.initState();
-    _accountNameController = TextEditingController(text: 'Juan Dela Cruz');
-    _positionController = TextEditingController(text: 'USC Treasurer');
-    _gcashNumberController = TextEditingController(text: '09123456789');
+    _accountNameController = TextEditingController(text: _defaultAccountName);
+    _positionController = TextEditingController(text: _defaultPosition);
+    _gcashNumberController = TextEditingController(text: _defaultGcashNumber);
+    _loadReceiverDetails();
   }
 
   @override
@@ -48,24 +57,117 @@ class _EditReceiverDetailsScreenState extends State<EditReceiverDetailsScreen> {
   Future<void> _saveChanges() async {
     FocusScope.of(context).unfocus();
 
-    if (!_formKey.currentState!.validate() || _isLoading) {
+    if (!_formKey.currentState!.validate() ||
+        _isLoading ||
+        _isFetchingReceiver) {
       return;
     }
 
     setState(() => _isLoading = true);
 
-    await Future.delayed(const Duration(milliseconds: 900));
+    try {
+      final savedReceiver = await PaymentReceiverService.instance
+          .upsertReceiver(
+            receiverId: _editingReceiverId,
+            name: _accountNameController.text,
+            gcashNumber: _gcashNumberController.text,
+            position: _positionController.text,
+            isActive: true,
+          );
 
-    if (!mounted) {
+      if (!mounted) {
+        return;
+      }
+
+      _editingReceiverId = savedReceiver.id.isNotEmpty
+          ? savedReceiver.id
+          : PaymentReceiverService.defaultReceiverId;
+
+      Navigator.of(context).pop(true);
       return;
+    } on PostgrestException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showErrorSnackBar(_supabaseErrorMessage(error));
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showErrorSnackBar('Unable to save receiver details. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _loadReceiverDetails() async {
+    setState(() => _isFetchingReceiver = true);
+
+    try {
+      final receiver = await PaymentReceiverService.instance
+          .fetchActiveReceiver();
+
+      if (!mounted) {
+        return;
+      }
+
+      if (receiver != null) {
+        _editingReceiverId = receiver.id.isNotEmpty
+            ? receiver.id
+            : PaymentReceiverService.defaultReceiverId;
+        _accountNameController.text = receiver.name.isNotEmpty
+            ? receiver.name
+            : _defaultAccountName;
+        _positionController.text = receiver.position.isNotEmpty
+            ? receiver.position
+            : _defaultPosition;
+
+        final normalizedNumber = receiver.gcashNumber.replaceAll(
+          RegExp(r'\D'),
+          '',
+        );
+        _gcashNumberController.text = normalizedNumber.isNotEmpty
+            ? normalizedNumber
+            : _defaultGcashNumber;
+      }
+    } on PostgrestException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showErrorSnackBar(_supabaseErrorMessage(error));
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showErrorSnackBar('Unable to load receiver details. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() => _isFetchingReceiver = false);
+      }
+    }
+  }
+
+  String _supabaseErrorMessage(PostgrestException error) {
+    final message = error.message.trim();
+    if (message.isNotEmpty) {
+      return message;
     }
 
-    setState(() => _isLoading = false);
+    final errorCode = error.code?.trim() ?? '';
+    if (errorCode.isNotEmpty) {
+      return 'Supabase request failed ($errorCode).';
+    }
 
+    return 'Unexpected database error. Please try again.';
+  }
+
+  void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Receiver details updated successfully'),
-        backgroundColor: Color(0xFF2E7D32),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFB3261E),
       ),
     );
   }
@@ -124,6 +226,17 @@ class _EditReceiverDetailsScreenState extends State<EditReceiverDetailsScreen> {
                                 subtitle:
                                     'Update payout details shown on payment screens',
                               ),
+                              if (_isFetchingReceiver) ...[
+                                const SizedBox(height: 10),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(999),
+                                  child: const LinearProgressIndicator(
+                                    minHeight: 4,
+                                    color: _royalBlue,
+                                    backgroundColor: _fieldBorder,
+                                  ),
+                                ),
+                              ],
                               const SizedBox(height: 12),
                               _buildFormCard(
                                 child: Column(
@@ -445,7 +558,7 @@ class _EditReceiverDetailsScreenState extends State<EditReceiverDetailsScreen> {
           width: double.infinity,
           height: 52,
           child: ElevatedButton(
-            onPressed: _isLoading ? null : _saveChanges,
+            onPressed: _isLoading || _isFetchingReceiver ? null : _saveChanges,
             style: ElevatedButton.styleFrom(
               backgroundColor: _royalBlue,
               foregroundColor: Colors.white,

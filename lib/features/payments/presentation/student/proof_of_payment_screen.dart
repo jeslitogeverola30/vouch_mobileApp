@@ -5,10 +5,15 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:ionicons/ionicons.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../data/payment_receiver_service.dart';
+import '../../data/receipt_image_upload_service.dart';
+import '../../data/student_transaction_service.dart';
 import '../../domain/payment_receipt_validators.dart';
 
 class ProofOfPaymentScreen extends StatefulWidget {
+  final int? requirementId;
   final String gcashNumber;
   final String accountName;
   final String paymentItem;
@@ -16,6 +21,7 @@ class ProofOfPaymentScreen extends StatefulWidget {
 
   const ProofOfPaymentScreen({
     super.key,
+    this.requirementId,
     this.gcashNumber = '0912 345 6789',
     this.accountName = 'JOSHUA SERRANO',
     this.paymentItem = 'Membership Fee',
@@ -31,11 +37,50 @@ class _ProofOfPaymentScreenState extends State<ProofOfPaymentScreen> {
   final TextEditingController _referenceController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
   bool _isLoading = false;
+  String? _receiverGcashNumber;
+  String? _receiverAccountName;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReceiverDetails();
+  }
 
   @override
   void dispose() {
     _referenceController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadReceiverDetails() async {
+    try {
+      final receiver = await PaymentReceiverService.instance
+          .fetchActiveReceiver();
+      if (!mounted || receiver == null) {
+        return;
+      }
+
+      setState(() {
+        _receiverGcashNumber = receiver.gcashNumber.trim();
+        _receiverAccountName = receiver.name.trim();
+      });
+    } catch (_) {}
+  }
+
+  String get _displayGcashNumber {
+    final rawValue =
+        (_receiverGcashNumber != null && _receiverGcashNumber!.isNotEmpty)
+        ? _receiverGcashNumber!
+        : widget.gcashNumber;
+    return PaymentReceiverDetails.formatGcashNumber(rawValue);
+  }
+
+  String get _displayAccountName {
+    if (_receiverAccountName != null && _receiverAccountName!.isNotEmpty) {
+      return _receiverAccountName!;
+    }
+
+    return widget.accountName;
   }
 
   Future<void> _pickImage() async {
@@ -118,32 +163,134 @@ class _ProofOfPaymentScreenState extends State<ProofOfPaymentScreen> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    final requirementId = widget.requirementId;
+    if (requirementId == null || requirementId <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to submit proof for this fee.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (!mounted) {
+    final referenceNumber = _referenceController.text.trim();
+    if (referenceNumber.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter reference number'),
+          backgroundColor: Colors.red,
+        ),
+      );
       return;
     }
 
     setState(() {
-      _isLoading = false;
+      _isLoading = true;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Proof of payment submitted successfully'),
-        backgroundColor: Color(0xFF003DA5),
-      ),
-    );
+    try {
+      final alreadySubmitted = await StudentTransactionService.instance
+          .hasSubmissionForRequirement(requirementId: requirementId);
+      if (alreadySubmitted) {
+        if (!mounted) {
+          return;
+        }
 
-    await Future.delayed(const Duration(milliseconds: 900));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You already submitted proof for this fee.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
 
-    if (mounted) {
-      Navigator.pop(context);
+      final proofPhotoUrl = await ReceiptImageUploadService.uploadReceiptImage(
+        imageFile: _uploadedFile!,
+      );
+
+      await StudentTransactionService.instance.createTransaction(
+        requirementId: requirementId,
+        referenceNumber: referenceNumber,
+        proofPhotoUrl: proofPhotoUrl,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Proof of payment submitted successfully'),
+          backgroundColor: Color(0xFF003DA5),
+        ),
+      );
+
+      await Future.delayed(const Duration(milliseconds: 900));
+
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
+    } on PostgrestException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_supabaseErrorMessage(error)),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } on ArgumentError catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message?.toString() ?? 'Invalid input.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_exceptionMessage(error)),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
+  }
+
+  String _supabaseErrorMessage(PostgrestException error) {
+    final message = error.message.trim();
+    if (message.isNotEmpty) {
+      return message;
+    }
+
+    final errorCode = error.code?.trim() ?? '';
+    if (errorCode.isNotEmpty) {
+      return 'Supabase request failed ($errorCode).';
+    }
+
+    return 'Unexpected database error. Please try again.';
+  }
+
+  String _exceptionMessage(Object error) {
+    final message = error.toString().trim();
+    if (message.startsWith('Exception: ')) {
+      return message.substring('Exception: '.length).trim();
+    }
+    return message;
   }
 
   @override
@@ -319,14 +466,14 @@ class _ProofOfPaymentScreenState extends State<ProofOfPaymentScreen> {
           const SizedBox(height: 14),
           _buildCopyRow(
             label: 'GCash Number',
-            value: widget.gcashNumber,
-            onCopy: () => _copyToClipboard(widget.gcashNumber, 'GCash Number'),
+            value: _displayGcashNumber,
+            onCopy: () => _copyToClipboard(_displayGcashNumber, 'GCash Number'),
           ),
           const SizedBox(height: 12),
           _buildCopyRow(
             label: 'Account Name',
-            value: widget.accountName,
-            onCopy: () => _copyToClipboard(widget.accountName, 'Account Name'),
+            value: _displayAccountName,
+            onCopy: () => _copyToClipboard(_displayAccountName, 'Account Name'),
           ),
           const SizedBox(height: 12),
           Container(
@@ -509,7 +656,7 @@ class _ProofOfPaymentScreenState extends State<ProofOfPaymentScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Reference Number (Optional)',
+          'Reference Number',
           style: GoogleFonts.poppins(
             fontSize: 13,
             fontWeight: FontWeight.w700,

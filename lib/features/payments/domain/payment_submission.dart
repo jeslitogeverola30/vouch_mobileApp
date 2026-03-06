@@ -18,6 +18,7 @@ class PaymentSubmission {
   final String proofFile;
   final String receiptAssetPath;
   final String status;
+  final String rejectionNote;
 
   const PaymentSubmission({
     required this.id,
@@ -31,5 +32,6 @@ class PaymentSubmission {
     required this.proofFile,
     required this.receiptAssetPath,
     required this.status,
+    this.rejectionNote = '',
   });
 }

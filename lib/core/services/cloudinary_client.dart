@@ -7,6 +7,8 @@ class CloudinaryClient {
   static String? get uploadPreset => _normalizedEnv('CLOUDINARY_UPLOAD_PRESET');
   static String? get profileUploadPreset =>
       _normalizedEnv('CLOUDINARY_PROFILE_UPLOAD_PRESET');
+  static String? get receiptUploadPreset =>
+      _normalizedEnv('CLOUDINARY_RECEIPT_UPLOAD_PRESET');
 
   static bool get isCloudConfigured =>
       cloudName != null && cloudName!.isNotEmpty;
@@ -18,6 +20,11 @@ class CloudinaryClient {
       isCloudConfigured &&
       profileUploadPreset != null &&
       profileUploadPreset!.isNotEmpty;
+
+  static bool get isReceiptUploadConfigured =>
+      isCloudConfigured &&
+      receiptUploadPreset != null &&
+      receiptUploadPreset!.isNotEmpty;
 
   static bool get isConfigured => isEventUploadConfigured;
 

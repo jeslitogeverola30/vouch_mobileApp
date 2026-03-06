@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:ionicons/ionicons.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/utils/global_header_search.dart';
 import '../../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../../core/widgets/app_main_header.dart';
+import '../../data/payment_requirement_service.dart';
+import '../../data/student_transaction_service.dart';
 import '../../data/student_payment_seed_data.dart';
 import '../../domain/student_payment_filters.dart';
 import '../../domain/student_payment_item.dart';
@@ -24,15 +28,201 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
   int _selectedNavIndex = 3;
 
   final StudentPaymentSummary _summary = StudentPaymentSeedData.summary;
-  final List<StudentPaymentItem> _paymentItems = List<StudentPaymentItem>.from(
-    StudentPaymentSeedData.paymentItems,
-  );
+  final List<StudentPaymentItem> _paymentItems = [];
+  bool _isLoadingFees = false;
+  String? _feesErrorMessage;
+  double _totalPayable = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCreatedFees();
+  }
 
   List<StudentPaymentItem> get _filteredPayments {
     return StudentPaymentFilters.filterByTab(
       items: _paymentItems,
       tab: selectedTab,
     );
+  }
+
+  Future<void> _loadCreatedFees() async {
+    setState(() {
+      _isLoadingFees = true;
+      _feesErrorMessage = null;
+    });
+
+    try {
+      final createdFees = await PaymentRequirementService.instance
+          .fetchRequirementsForStudents();
+
+      final currentStudentId = await StudentTransactionService.instance
+          .resolveCurrentStudentId();
+
+      final transactions = await StudentTransactionService.instance
+          .fetchTransactionsForCurrentStudent();
+      final transactionsByRequirement = <int, StudentTransactionRecord>{
+        for (final transaction in transactions)
+          if (transaction.requirementId > 0 &&
+              transaction.studentId.trim() == currentStudentId)
+            transaction.requirementId: transaction,
+      };
+
+      final mappedFees = createdFees
+          .map(
+            (fee) =>
+                _mapRequirementToItem(fee, transactionsByRequirement[fee.id]),
+          )
+          .toList();
+      final nextTotal = createdFees.fold<double>(0, (total, fee) {
+        final status = _resolveCardStatus(
+          transactionsByRequirement[fee.id]?.status,
+        );
+        final isPayable = status != StudentPaymentStatus.paid;
+
+        return isPayable ? total + fee.amount : total;
+      });
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _paymentItems
+          ..clear()
+          ..addAll(mappedFees);
+        _totalPayable = nextTotal;
+      });
+    } on PostgrestException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _paymentItems.clear();
+        _totalPayable = 0;
+        _feesErrorMessage = _supabaseErrorMessage(error);
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _paymentItems.clear();
+        _totalPayable = 0;
+        _feesErrorMessage = 'Unable to load created fees. Please try again.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingFees = false);
+      }
+    }
+  }
+
+  StudentPaymentItem _mapRequirementToItem(
+    PaymentRequirementDetails fee,
+    StudentTransactionRecord? transaction,
+  ) {
+    final status = _resolveCardStatus(transaction?.status);
+
+    return StudentPaymentItem(
+      requirementId: fee.id,
+      name: fee.title.isNotEmpty ? fee.title : 'Untitled Fee',
+      amount: '₱${fee.amount.toStringAsFixed(2)}',
+      dueDate: _extractDueDate(fee.description),
+      proof: _resolveProofLabel(transaction),
+      status: status,
+      obligation: fee.isMandatory ? 'OBLIGATORY' : 'NON-OBLIGATORY',
+      actionText: _resolveActionText(status),
+      rejectionNote: transaction?.reviewNote ?? '',
+    );
+  }
+
+  String _resolveCardStatus(String? rawStatus) {
+    final normalized = (rawStatus ?? '').trim().toLowerCase();
+
+    if (normalized.isEmpty || normalized == 'to_pay') {
+      return StudentPaymentStatus.toPay;
+    }
+
+    if (normalized == 'pending' || normalized == 'for_review') {
+      return StudentPaymentStatus.pending;
+    }
+
+    if (normalized == 'paid' ||
+        normalized == 'approved' ||
+        normalized == 'verified') {
+      return StudentPaymentStatus.paid;
+    }
+
+    if (normalized == 'rejected' || normalized == 'declined') {
+      return StudentPaymentStatus.rejected;
+    }
+
+    return StudentPaymentStatus.pending;
+  }
+
+  String _resolveProofLabel(StudentTransactionRecord? transaction) {
+    if (transaction == null) {
+      return 'N/A';
+    }
+
+    final reference = transaction.referenceNumber.trim();
+    if (reference.isNotEmpty) {
+      return reference;
+    }
+
+    final proofUrl = transaction.proofPhotoUrl.trim();
+    if (proofUrl.isNotEmpty) {
+      return 'Uploaded';
+    }
+
+    return 'Submitted';
+  }
+
+  String _resolveActionText(String status) {
+    if (status == StudentPaymentStatus.pending) {
+      return 'Awaiting Admin Verification...';
+    }
+
+    if (status == StudentPaymentStatus.paid) {
+      return 'Payment Verified';
+    }
+
+    if (status == StudentPaymentStatus.rejected) {
+      return 'Submit Proof Again';
+    }
+
+    return 'Submit Proof of Payment';
+  }
+
+  String _extractDueDate(String description) {
+    final match = RegExp(
+      r'Due Date:\s*([^\n\r]+)',
+      caseSensitive: false,
+    ).firstMatch(description);
+
+    final dueDate = match?.group(1)?.trim() ?? '';
+    if (dueDate.isNotEmpty) {
+      return dueDate;
+    }
+
+    return 'No due date';
+  }
+
+  String _supabaseErrorMessage(PostgrestException error) {
+    final message = error.message.trim();
+    if (message.isNotEmpty) {
+      return message;
+    }
+
+    final errorCode = error.code?.trim() ?? '';
+    if (errorCode.isNotEmpty) {
+      return 'Supabase request failed ($errorCode).';
+    }
+
+    return 'Unexpected database error. Please try again.';
   }
 
   @override
@@ -102,22 +292,155 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                 const SizedBox(height: 14),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    children: _filteredPayments
-                        .map(
-                          (payment) => _PaymentCard(
-                            payment: payment,
-                            onActionTap: () => _handlePaymentAction(payment),
-                          ),
-                        )
-                        .toList(),
-                  ),
+                  child: _buildPaymentsContent(),
                 ),
               ],
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPaymentsContent() {
+    if (_isLoadingFees) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Center(
+          child: SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(strokeWidth: 2.8),
+          ),
+        ),
+      );
+    }
+
+    if (_feesErrorMessage != null) {
+      return _buildInfoState(
+        icon: Ionicons.alert_circle_outline,
+        message: _feesErrorMessage!,
+        actionLabel: 'Retry',
+        onAction: _loadCreatedFees,
+        messageColor: const Color(0xFFB3261E),
+      );
+    }
+
+    final filtered = _filteredPayments;
+    if (filtered.isEmpty) {
+      final message = _paymentItems.isEmpty
+          ? 'No created fees available yet.'
+          : 'No fees in this tab.';
+
+      return _buildInfoState(
+        icon: Ionicons.receipt_outline,
+        message: message,
+        actionLabel: _paymentItems.isEmpty ? 'Refresh' : null,
+        onAction: _paymentItems.isEmpty ? _loadCreatedFees : null,
+        messageColor: const Color(0xFF6B7280),
+      );
+    }
+
+    return Column(
+      children: filtered
+          .map(
+            (payment) => _PaymentCard(
+              payment: payment,
+              onActionTap: () => _handlePaymentAction(payment),
+              onNoteTap:
+                  payment.status == StudentPaymentStatus.rejected &&
+                      payment.rejectionNote.trim().isNotEmpty
+                  ? () => _showRejectionNoteDialog(payment)
+                  : null,
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  void _showRejectionNoteDialog(StudentPaymentItem payment) {
+    final rejectionNote = payment.rejectionNote.trim();
+    if (rejectionNote.isEmpty) {
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: const Text(
+          'Rejection Note',
+          style: TextStyle(
+            color: Color(0xFF003DA5),
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        content: Text(
+          rejectionNote,
+          style: const TextStyle(color: Colors.black87, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text(
+              'Close',
+              style: TextStyle(color: Color(0xFF003DA5)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoState({
+    required IconData icon,
+    required String message,
+    required Color messageColor,
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF003DA5).withOpacity(0.12)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: messageColor, size: 28),
+          const SizedBox(height: 10),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+              color: messageColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: onAction,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF003DA5),
+                side: BorderSide(
+                  color: const Color(0xFF003DA5).withOpacity(0.3),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: Text(actionLabel),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -171,7 +494,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                               ),
                               const SizedBox(height: 10),
                               Text(
-                                '₱ ${_summary.totalPayable.toStringAsFixed(2)}',
+                                '₱ ${_totalPayable.toStringAsFixed(2)}',
                                 style: GoogleFonts.poppins(
                                   color: Colors.white,
                                   fontSize: 40,
@@ -313,19 +636,26 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     });
   }
 
-  void _handlePaymentAction(StudentPaymentItem payment) {
+  Future<void> _handlePaymentAction(StudentPaymentItem payment) async {
     if (!StudentPaymentFilters.canSubmitProof(payment)) {
       return;
     }
 
-    Navigator.of(context).push(
+    final didSubmit = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => ProofOfPaymentScreen(
+          requirementId: payment.requirementId,
           paymentItem: payment.name,
           amountToPay: payment.amount,
         ),
       ),
     );
+
+    if (!mounted || didSubmit != true) {
+      return;
+    }
+
+    await _loadCreatedFees();
   }
 }
 
@@ -350,12 +680,29 @@ class _SummaryYellowPanelClipper extends CustomClipper<Path> {
 class _PaymentCard extends StatelessWidget {
   final StudentPaymentItem payment;
   final VoidCallback onActionTap;
+  final VoidCallback? onNoteTap;
 
-  const _PaymentCard({required this.payment, required this.onActionTap});
+  const _PaymentCard({
+    required this.payment,
+    required this.onActionTap,
+    this.onNoteTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final isPending = payment.status == StudentPaymentStatus.pending;
+    final isRejected = payment.status == StudentPaymentStatus.rejected;
+    final hasRejectionNote =
+        isRejected && payment.rejectionNote.trim().isNotEmpty;
+    final canSubmit = StudentPaymentFilters.canSubmitProof(payment);
+    final statusChipColor = isPending
+        ? const Color(0xFFFFC107).withOpacity(0.2)
+        : isRejected
+        ? const Color(0xFFC62828).withOpacity(0.14)
+        : const Color(0xFFE3F2FD);
+    final statusTextColor = isRejected
+        ? const Color(0xFFC62828)
+        : const Color(0xFF003DA5);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -410,22 +757,42 @@ class _PaymentCard extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isPending
-                      ? const Color(0xFFFFC107).withOpacity(0.2)
-                      : const Color(0xFFE3F2FD),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  payment.status,
-                  style: GoogleFonts.poppins(
-                    color: const Color(0xFF003DA5),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+              Row(
+                children: [
+                  if (hasRejectionNote && onNoteTap != null)
+                    InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: onNoteTap,
+                      child: Padding(
+                        padding: const EdgeInsets.all(3),
+                        child: Icon(
+                          Ionicons.document_text_outline,
+                          color: const Color(0xFFC62828),
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  if (hasRejectionNote && onNoteTap != null)
+                    const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusChipColor,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      payment.status,
+                      style: GoogleFonts.poppins(
+                        color: statusTextColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ],
           ),
@@ -456,17 +823,14 @@ class _PaymentCard extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFFC107),
                 foregroundColor: const Color(0xFF003DA5),
+                disabledBackgroundColor: const Color(0xFFE6EAF2),
+                disabledForegroundColor: const Color(0xFF6B7280),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              onPressed: () {
-                if (isPending) {
-                  return;
-                }
-                onActionTap();
-              },
+              onPressed: canSubmit ? onActionTap : null,
               child: Text(
                 payment.actionText,
                 style: GoogleFonts.poppins(

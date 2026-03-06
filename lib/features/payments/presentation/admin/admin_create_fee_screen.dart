@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../data/payment_requirement_service.dart';
 import '../../domain/payment_date_formatters.dart';
 import '../../domain/payment_form_validators.dart';
 
@@ -83,20 +85,84 @@ class _CreateFeeScreenState extends State<CreateFeeScreen> {
 
     setState(() => _isSubmitting = true);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Fee created successfully!'),
-        backgroundColor: Color(0xFF2E7D32),
-      ),
-    );
+    try {
+      final amount = _parseAmount(_amount.text);
+      if (amount == null || amount <= 0) {
+        _showErrorSnackBar('Enter valid amount');
+        return;
+      }
 
-    await Future.delayed(const Duration(milliseconds: 700));
+      final dueDateText = _dueDate.text.trim();
+      final instructionsText = _instructions.text.trim();
+      final description = instructionsText.isEmpty
+          ? 'Due Date: $dueDateText'
+          : 'Due Date: $dueDateText\n\n$instructionsText';
 
-    if (!mounted) {
-      return;
+      await PaymentRequirementService.instance.createRequirement(
+        title: _feeTitle.text,
+        description: description,
+        amount: amount,
+        isMandatory: _isObligatory,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).pop(true);
+    } on PostgrestException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showErrorSnackBar(_supabaseErrorMessage(error));
+    } on ArgumentError catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showErrorSnackBar(error.message.toString());
+    } on StateError catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showErrorSnackBar(error.message);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showErrorSnackBar('Unable to create fee. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  double? _parseAmount(String rawValue) {
+    final cleaned = rawValue.trim().replaceAll(',', '');
+    return double.tryParse(cleaned);
+  }
+
+  String _supabaseErrorMessage(PostgrestException error) {
+    final message = error.message.trim();
+    if (message.isNotEmpty) {
+      return message;
     }
 
-    Navigator.of(context).pop(true);
+    final errorCode = error.code?.trim() ?? '';
+    if (errorCode.isNotEmpty) {
+      return 'Supabase request failed ($errorCode).';
+    }
+
+    return 'Unexpected database error. Please try again.';
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFB3261E),
+      ),
+    );
   }
 
   @override

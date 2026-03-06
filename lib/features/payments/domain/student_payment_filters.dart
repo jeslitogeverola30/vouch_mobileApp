@@ -25,10 +25,17 @@ class StudentPaymentFilters {
           .toList();
     }
 
+    if (tab == StudentPaymentTab.rejected) {
+      return items
+          .where((item) => item.status == StudentPaymentStatus.rejected)
+          .toList();
+    }
+
     return items;
   }
 
   static bool canSubmitProof(StudentPaymentItem item) {
-    return item.status == StudentPaymentStatus.toPay;
+    return item.status == StudentPaymentStatus.toPay ||
+        item.status == StudentPaymentStatus.rejected;
   }
 }
