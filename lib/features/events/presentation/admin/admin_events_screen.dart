@@ -6,11 +6,12 @@ import '../../../../core/widgets/admin_bottom_navigation_bar.dart';
 import '../../../../core/utils/global_header_search.dart';
 import '../../../../core/widgets/app_main_header.dart';
 import '../../../../core/config/app_router.dart';
+import '../../data/event_rating_service.dart';
 import '../../data/event_query_service.dart';
-import '../../data/event_seed_data.dart';
 import '../../domain/event_date_time_formatters.dart';
 import 'admin_create_event_screen.dart';
 import 'admin_event_details_screen.dart';
+import 'admin_event_record_screen.dart';
 
 const Color royalBlue = Color(0xFF003DA5);
 const Color gold = Color(0xFFFFC107);
@@ -39,12 +40,14 @@ class _EventsScreenState extends State<AdminEventsScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
   late Future<List<Map<String, dynamic>>> _eventsFuture;
+  late Future<List<Map<String, dynamic>>> _rateEventsFuture;
   int _selectedNavIndex = 2;
 
   @override
   void initState() {
     super.initState();
     _eventsFuture = EventQueryService.fetchEvents();
+    _rateEventsFuture = EventRatingService.fetchAdminRateEvents();
     _tabController = TabController(
       length: 4,
       vsync: this,
@@ -55,6 +58,7 @@ class _EventsScreenState extends State<AdminEventsScreen>
   void _refreshEvents() {
     setState(() {
       _eventsFuture = EventQueryService.fetchEvents();
+      _rateEventsFuture = EventRatingService.fetchAdminRateEvents();
     });
   }
 
@@ -501,74 +505,134 @@ class _EventsScreenState extends State<AdminEventsScreen>
     );
   }
 
-  Widget _buildPastEventCard(Map<String, dynamic> event) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: royalBlue.withOpacity(0.1), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+  Future<void> _openPastEventRecord(Map<String, dynamic> event) async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EventRecordScreen(
+          eventId: _readInt(event['id']),
+          eventName: event['name'] as String? ?? 'Event',
+          eventDate: event['date'] as String? ?? 'Date not available',
+          eventDateRaw: event['eventDateRaw'] as String?,
+          isEventDone: true,
+          eventLocation: event['location'] as String? ?? 'University Campus',
+          eventTimeIn: event['timeIn'] as String? ?? '-',
+          eventTimeOut: event['timeOut'] as String? ?? '-',
+          eventImage:
+              event['image'] as String? ?? 'assets/images/event-siglakas.jpg',
+          isObligatory: event['isObligatory'] as bool? ?? false,
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            event['name'],
-            style: const TextStyle(
-              color: royalBlue,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              const Icon(Ionicons.calendar_outline, size: 14, color: darkGray),
-              const SizedBox(width: 5),
-              Text(
-                event['date'],
-                style: const TextStyle(color: darkGray, fontSize: 13),
+    );
+  }
+
+  Widget _buildPastEventCard(Map<String, dynamic> event) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => _openPastEventRecord(event),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: royalBlue.withOpacity(0.1), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          if (event['attended']) ...[
-            _buildTimeRow(
-              label: 'Time-in',
-              time: event['timeIn'],
-              icon: Ionicons.log_in_outline,
-            ),
-            const SizedBox(height: 8),
-            _buildTimeRow(
-              label: 'Time-out',
-              time: event['timeOut'],
-              icon: Ionicons.log_out_outline,
-            ),
-          ] else
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                'Not Attended',
-                style: TextStyle(
-                  color: Colors.red,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                event['name'],
+                style: const TextStyle(
+                  color: royalBlue,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  fontSize: 12,
                 ),
               ),
-            ),
-        ],
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Icon(
+                    Ionicons.calendar_outline,
+                    size: 14,
+                    color: darkGray,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    event['date'],
+                    style: const TextStyle(color: darkGray, fontSize: 13),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (event['attended']) ...[
+                _buildTimeRow(
+                  label: 'Time-in',
+                  time: event['timeIn'],
+                  icon: Ionicons.log_in_outline,
+                ),
+                const SizedBox(height: 8),
+                _buildTimeRow(
+                  label: 'Time-out',
+                  time: event['timeOut'],
+                  icon: Ionicons.log_out_outline,
+                ),
+              ] else
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Not Attended',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(
+                    Ionicons.document_text_outline,
+                    size: 14,
+                    color: royalBlue.withOpacity(0.7),
+                  ),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'View record',
+                    style: TextStyle(
+                      color: royalBlue,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    Ionicons.chevron_forward,
+                    size: 15,
+                    color: royalBlue.withOpacity(0.8),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -664,20 +728,40 @@ class _EventsScreenState extends State<AdminEventsScreen>
   }
 
   Widget _buildRateTab() {
-    final rateEvents = EventSeedData.ratedEvents;
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _rateEventsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: rateEvents
-            .map((event) => _buildRateEventCard(event))
-            .toList(),
-      ),
+        if (snapshot.hasError) {
+          return _buildNoEventsState('Failed to load event ratings.');
+        }
+
+        final rateEvents = snapshot.data ?? const <Map<String, dynamic>>[];
+        if (rateEvents.isEmpty) {
+          return _buildNoEventsState('No event ratings available yet');
+        }
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: rateEvents
+                .map((event) => _buildRateEventCard(event))
+                .toList(),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildRateEventCard(Map<String, dynamic> event) {
     final eventName = event['name'] as String? ?? 'Event';
+    final averageRating = _readDouble(event['rating']);
+    final reviewCount = _readInt(event['reviews']) ?? 0;
+    final averageStarCount = averageRating.floor().clamp(0, 5);
+    final ratingBreakdown = _readBreakdown(event['ratingBreakdown']);
     final comments = (event['comments'] as List<dynamic>? ?? const [])
         .cast<Map<String, dynamic>>();
 
@@ -724,7 +808,7 @@ class _EventsScreenState extends State<AdminEventsScreen>
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    event['rating'].toString(),
+                    averageRating.toStringAsFixed(1),
                     style: const TextStyle(
                       color: royalBlue,
                       fontSize: 30,
@@ -735,7 +819,7 @@ class _EventsScreenState extends State<AdminEventsScreen>
                     children: List.generate(
                       5,
                       (index) => Icon(
-                        index < event['rating'].toInt()
+                        index < averageStarCount
                             ? Ionicons.star
                             : Ionicons.star_outline,
                         color: gold,
@@ -744,7 +828,7 @@ class _EventsScreenState extends State<AdminEventsScreen>
                     ),
                   ),
                   Text(
-                    '(${event['reviews']} reviews)',
+                    '($reviewCount reviews)',
                     style: const TextStyle(color: darkGray, fontSize: 10),
                   ),
                 ],
@@ -752,7 +836,7 @@ class _EventsScreenState extends State<AdminEventsScreen>
             ],
           ),
           const SizedBox(height: 12),
-          ..._buildRatingBreakdown(event['ratingBreakdown']),
+          ..._buildRatingBreakdown(ratingBreakdown),
           const SizedBox(height: 16),
           Container(
             width: double.infinity,
@@ -794,6 +878,36 @@ class _EventsScreenState extends State<AdminEventsScreen>
         ],
       ),
     );
+  }
+
+  double _readDouble(dynamic value) {
+    if (value is double) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    if (value is String) {
+      return double.tryParse(value.trim()) ?? 0;
+    }
+
+    return 0;
+  }
+
+  Map<String, int> _readBreakdown(dynamic value) {
+    final empty = const <String, int>{'5': 0, '4': 0, '3': 0, '2': 0, '1': 0};
+    if (value is! Map) {
+      return empty;
+    }
+
+    final output = <String, int>{...empty};
+    for (final stars in output.keys.toList()) {
+      output[stars] = _readInt(value[stars]) ?? 0;
+    }
+
+    return output;
   }
 
   List<Widget> _buildRatingBreakdown(Map<String, int> breakdown) {

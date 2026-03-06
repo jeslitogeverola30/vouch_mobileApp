@@ -145,7 +145,26 @@ class AppRouter {
           ),
         );
       case adminEventRecord:
-        return MaterialPageRoute(builder: (_) => const EventRecordScreen());
+        final args = settings.arguments is Map<String, dynamic>
+            ? settings.arguments! as Map<String, dynamic>
+            : <String, dynamic>{};
+        return MaterialPageRoute(
+          builder: (_) => EventRecordScreen(
+            eventId: _readInt(args['eventId']),
+            eventName: args['eventName'] as String? ?? 'Event',
+            eventDate: args['eventDate'] as String? ?? 'Date not available',
+            eventDateRaw: args['eventDateRaw'] as String?,
+            isEventDone: args['isEventDone'] as bool?,
+            eventLocation:
+                args['eventLocation'] as String? ?? 'University Campus',
+            eventTimeIn: args['eventTimeIn'] as String? ?? '-',
+            eventTimeOut: args['eventTimeOut'] as String? ?? '-',
+            eventImage:
+                args['eventImage'] as String? ??
+                'assets/images/event-siglakas.jpg',
+            isObligatory: args['isObligatory'] as bool? ?? false,
+          ),
+        );
       default:
         return MaterialPageRoute(
           builder: (_) =>
@@ -157,6 +176,10 @@ class AppRouter {
   static int? _readInt(dynamic value) {
     if (value is int) {
       return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
     }
 
     if (value is String) {

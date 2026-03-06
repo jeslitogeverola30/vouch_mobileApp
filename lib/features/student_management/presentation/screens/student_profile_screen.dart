@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
 
+import '../../data/supabase_student_management_impl.dart';
+import '../../domain/student_management_repository.dart';
+
 class StudentProfileAdminScreen extends StatefulWidget {
   final String studentName;
   final String studentId;
@@ -31,8 +34,12 @@ class _StudentProfileAdminScreenState extends State<StudentProfileAdminScreen> {
   static const Color _royalBlue = Color(0xFF003DA5);
   static const Color _gold = Color(0xFFFFC107);
   static const Color _mutedText = Color(0xFF6B7280);
+  final StudentManagementRepository _studentRepository =
+      SupabaseStudentManagementImpl.instance;
 
   late String _currentStatus;
+  bool _isUpdatingStatus = false;
+  bool _isDeletingAccount = false;
 
   @override
   void initState() {
@@ -65,38 +72,36 @@ class _StudentProfileAdminScreenState extends State<StudentProfileAdminScreen> {
   }
 
   Widget _buildAvatarImage() {
-    final isAssetImage = widget.avatarPath.startsWith('assets/');
+    final avatarPath = widget.avatarPath.trim();
+    if (avatarPath.isEmpty) {
+      return _buildAvatarFallback();
+    }
+
+    final isAssetImage = avatarPath.startsWith('assets/');
 
     if (isAssetImage) {
       return Image.asset(
-        widget.avatarPath,
+        avatarPath,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
-          return Container(
-            color: const Color(0xFFE5E7EB),
-            child: const Icon(
-              Ionicons.person,
-              size: 40,
-              color: Color(0xFF9CA3AF),
-            ),
-          );
+          return _buildAvatarFallback();
         },
       );
     }
 
     return Image.network(
-      widget.avatarPath,
+      avatarPath,
       fit: BoxFit.cover,
       errorBuilder: (context, error, stackTrace) {
-        return Container(
-          color: const Color(0xFFE5E7EB),
-          child: const Icon(
-            Ionicons.person,
-            size: 40,
-            color: Color(0xFF9CA3AF),
-          ),
-        );
+        return _buildAvatarFallback();
       },
+    );
+  }
+
+  Widget _buildAvatarFallback() {
+    return Container(
+      color: const Color(0xFFE5E7EB),
+      child: const Icon(Ionicons.person, size: 40, color: Color(0xFF9CA3AF)),
     );
   }
 
@@ -109,13 +114,49 @@ class _StudentProfileAdminScreenState extends State<StudentProfileAdminScreen> {
     );
   }
 
-  void _setStatus(String status) {
-    if (_currentStatus == status) {
+  Future<void> _setStatus(String status) async {
+    if (_currentStatus == status || _isUpdatingStatus || _isDeletingAccount) {
       return;
     }
 
-    setState(() => _currentStatus = status);
-    _showActionToast('Account status set to $status');
+    final studentId = widget.studentId.trim();
+    if (studentId.isEmpty) {
+      _showActionToast('Missing student ID');
+      return;
+    }
+
+    setState(() {
+      _isUpdatingStatus = true;
+    });
+
+    try {
+      if (status == 'Active') {
+        await _studentRepository.activateStudents([studentId]);
+      } else if (status == 'Frozen') {
+        await _studentRepository.freezeStudents([studentId]);
+      } else {
+        return;
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() => _currentStatus = status);
+      _showActionToast('Account status set to $status');
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showActionToast('Unable to update account status');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingStatus = false;
+        });
+      }
+    }
   }
 
   Future<void> _confirmDeleteAccount() async {
@@ -163,14 +204,44 @@ class _StudentProfileAdminScreenState extends State<StudentProfileAdminScreen> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Account deleted successfully'),
-        backgroundColor: Color(0xFFB3261E),
-      ),
-    );
+    final studentId = widget.studentId.trim();
+    if (studentId.isEmpty) {
+      _showActionToast('Missing student ID');
+      return;
+    }
 
-    Navigator.of(context).pop({'deleted': true});
+    setState(() {
+      _isDeletingAccount = true;
+    });
+
+    try {
+      await _studentRepository.deleteStudents([studentId]);
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account deleted successfully'),
+          backgroundColor: Color(0xFFB3261E),
+        ),
+      );
+
+      Navigator.of(context).pop({'deleted': true, 'studentId': studentId});
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showActionToast('Unable to delete account');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeletingAccount = false;
+        });
+      }
+    }
   }
 
   @override
@@ -594,6 +665,7 @@ class _StudentProfileAdminScreenState extends State<StudentProfileAdminScreen> {
   Widget _buildAccountControls() {
     final isActive = _currentStatus == 'Active';
     final isFrozen = _currentStatus == 'Frozen';
+    final isBusy = _isUpdatingStatus || _isDeletingAccount;
 
     return Container(
       width: double.infinity,
@@ -609,7 +681,7 @@ class _StudentProfileAdminScreenState extends State<StudentProfileAdminScreen> {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () => _setStatus('Active'),
+                  onPressed: isBusy ? null : () => _setStatus('Active'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _royalBlue,
                     backgroundColor: isActive
@@ -633,7 +705,7 @@ class _StudentProfileAdminScreenState extends State<StudentProfileAdminScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () => _setStatus('Frozen'),
+                  onPressed: isBusy ? null : () => _setStatus('Frozen'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF455A64),
                     backgroundColor: isFrozen
@@ -660,7 +732,7 @@ class _StudentProfileAdminScreenState extends State<StudentProfileAdminScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _confirmDeleteAccount,
+              onPressed: isBusy ? null : _confirmDeleteAccount,
               icon: const Icon(Ionicons.trash_outline, size: 18),
               label: const Text(
                 'Delete Account',

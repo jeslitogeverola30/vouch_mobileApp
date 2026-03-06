@@ -68,4 +68,13 @@ class MockStudentManagementImpl implements StudentManagementRepository {
   Future<List<AttendanceRecordEntity>> fetchAttendanceRecords() async {
     return const [];
   }
+
+  @override
+  Future<void> freezeStudents(List<String> studentIds) async {}
+
+  @override
+  Future<void> activateStudents(List<String> studentIds) async {}
+
+  @override
+  Future<void> deleteStudents(List<String> studentIds) async {}
 }

@@ -16,10 +16,51 @@ class SupabaseStudentManagementImpl implements StudentManagementRepository {
   Future<List<StudentEntity>> fetchStudents() async {
     final response = await _client
         .from('students')
-        .select('student_id, full_name, email, faculty, program')
+        .select(
+          'student_id, full_name, email, faculty, program, account_status, profile_photo_url',
+        )
         .order('full_name', ascending: true);
 
     return List<Map<String, dynamic>>.from(response).map(_mapStudent).toList();
+  }
+
+  @override
+  Future<void> freezeStudents(List<String> studentIds) async {
+    final normalizedIds = _normalizeStudentIds(studentIds);
+    if (normalizedIds.isEmpty) {
+      return;
+    }
+
+    await _client
+        .from('students')
+        .update({'account_status': 'frozen'})
+        .inFilter('student_id', normalizedIds);
+  }
+
+  @override
+  Future<void> activateStudents(List<String> studentIds) async {
+    final normalizedIds = _normalizeStudentIds(studentIds);
+    if (normalizedIds.isEmpty) {
+      return;
+    }
+
+    await _client
+        .from('students')
+        .update({'account_status': 'active'})
+        .inFilter('student_id', normalizedIds);
+  }
+
+  @override
+  Future<void> deleteStudents(List<String> studentIds) async {
+    final normalizedIds = _normalizeStudentIds(studentIds);
+    if (normalizedIds.isEmpty) {
+      return;
+    }
+
+    await _client
+        .from('students')
+        .delete()
+        .inFilter('student_id', normalizedIds);
   }
 
   @override
@@ -53,7 +94,11 @@ class SupabaseStudentManagementImpl implements StudentManagementRepository {
         ? _readString(data['full_name'])
         : _readString(data['name']);
     final normalizedName = fullName.isEmpty ? 'Unknown Student' : fullName;
-    final status = _readString(data['status']);
+    final status = _normalizeStatus(
+      _readString(data['account_status']).isNotEmpty
+          ? _readString(data['account_status'])
+          : _readString(data['status']),
+    );
     final program = _readString(data['program']).isNotEmpty
         ? _readString(data['program'])
         : _readString(data['faculty']);
@@ -63,13 +108,22 @@ class SupabaseStudentManagementImpl implements StudentManagementRepository {
       name: normalizedName,
       email: _readString(data['email']),
       program: program,
-      status: status.isEmpty ? 'Active' : status,
+      status: status,
       initials: _extractInitials(normalizedName),
+      avatarUrl: _readString(data['profile_photo_url']),
     );
   }
 
   String _readString(dynamic value) {
     return value?.toString().trim() ?? '';
+  }
+
+  List<String> _normalizeStudentIds(List<String> studentIds) {
+    return studentIds
+        .map(_readString)
+        .where((studentId) => studentId.isNotEmpty)
+        .toSet()
+        .toList();
   }
 
   String _extractInitials(String fullName) {
@@ -87,5 +141,28 @@ class SupabaseStudentManagementImpl implements StudentManagementRepository {
     }
 
     return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+  }
+
+  String _normalizeStatus(String value) {
+    final normalized = value.trim().toLowerCase();
+
+    switch (normalized) {
+      case 'active':
+        return 'Active';
+      case 'pending':
+        return 'Pending';
+      case 'frozen':
+        return 'Frozen';
+      default:
+        if (normalized.isEmpty) {
+          return 'Active';
+        }
+
+        if (normalized.length == 1) {
+          return normalized.toUpperCase();
+        }
+
+        return '${normalized[0].toUpperCase()}${normalized.substring(1)}';
+    }
   }
 }

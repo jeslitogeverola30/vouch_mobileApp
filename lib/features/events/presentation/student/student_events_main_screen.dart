@@ -6,6 +6,7 @@ import '../../../../core/utils/global_header_search.dart';
 import '../../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../../core/widgets/app_main_header.dart';
 import '../../../../core/config/app_router.dart';
+import '../../data/event_rating_service.dart';
 import '../../data/event_query_service.dart';
 import '../../data/event_seed_data.dart';
 import '../../domain/event_date_time_formatters.dart';
@@ -38,6 +39,7 @@ class _EventsScreenState extends State<EventsScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
   late Future<List<Map<String, dynamic>>> _eventsFuture;
+  late Future<List<Map<String, dynamic>>> _rateEventsFuture;
   int _selectedNavIndex = 1;
   final Map<String, int> _userRatings = {};
   final Map<String, Set<String>> _selectedSuggestions = {};
@@ -46,7 +48,8 @@ class _EventsScreenState extends State<EventsScreen>
   @override
   void initState() {
     super.initState();
-    _eventsFuture = EventQueryService.fetchEvents();
+    _eventsFuture = EventQueryService.fetchEventsForCurrentStudent();
+    _rateEventsFuture = EventRatingService.fetchStudentRateEvents();
     _tabController = TabController(
       length: 4,
       vsync: this,
@@ -63,11 +66,20 @@ class _EventsScreenState extends State<EventsScreen>
     super.dispose();
   }
 
-  TextEditingController _feedbackControllerFor(String eventName) {
+  TextEditingController _feedbackControllerFor(
+    String eventKey, {
+    String initialText = '',
+  }) {
     return _customFeedbackControllers.putIfAbsent(
-      eventName,
-      () => TextEditingController(),
+      eventKey,
+      () => TextEditingController(text: initialText),
     );
+  }
+
+  void _refreshRateEvents() {
+    setState(() {
+      _rateEventsFuture = EventRatingService.fetchStudentRateEvents();
+    });
   }
 
   @override
@@ -485,6 +497,13 @@ class _EventsScreenState extends State<EventsScreen>
   }
 
   Widget _buildPastEventCard(Map<String, dynamic> event) {
+    final studentTimeIn = _readOptionalString(event['studentTimeIn']);
+    final studentTimeOut = _readOptionalString(event['studentTimeOut']);
+    final hasScannedTime =
+        (studentTimeIn?.isNotEmpty ?? false) ||
+        (studentTimeOut?.isNotEmpty ?? false);
+    final isAttended = event['attended'] == true || hasScannedTime;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -523,16 +542,16 @@ class _EventsScreenState extends State<EventsScreen>
             ],
           ),
           const SizedBox(height: 12),
-          if (event['attended']) ...[
+          if (isAttended) ...[
             _buildTimeRow(
               label: 'Time-in',
-              time: event['timeIn'],
+              time: studentTimeIn ?? 'No time-in',
               icon: Ionicons.log_in_outline,
             ),
             const SizedBox(height: 8),
             _buildTimeRow(
               label: 'Time-out',
-              time: event['timeOut'],
+              time: studentTimeOut ?? 'No time-out',
               icon: Ionicons.log_out_outline,
             ),
           ] else
@@ -543,7 +562,7 @@ class _EventsScreenState extends State<EventsScreen>
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Text(
-                'Not Attended',
+                'Absent',
                 style: TextStyle(
                   color: Colors.red,
                   fontWeight: FontWeight.bold,
@@ -582,7 +601,7 @@ class _EventsScreenState extends State<EventsScreen>
           ),
           const Spacer(),
           Text(
-            time ?? '-',
+            time ?? '',
             style: const TextStyle(
               color: royalBlue,
               fontSize: 12,
@@ -647,23 +666,50 @@ class _EventsScreenState extends State<EventsScreen>
   }
 
   Widget _buildRateTab() {
-    final rateEvents = EventSeedData.ratedEvents;
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _rateEventsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: rateEvents
-            .map((event) => _buildRateEventCard(event))
-            .toList(),
-      ),
+        if (snapshot.hasError) {
+          return _buildNoEventsState('Failed to load event ratings.');
+        }
+
+        final rateEvents = snapshot.data ?? const <Map<String, dynamic>>[];
+        if (rateEvents.isEmpty) {
+          return _buildNoEventsState('No events available for rating yet');
+        }
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: rateEvents
+                .map((event) => _buildRateEventCard(event))
+                .toList(),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildRateEventCard(Map<String, dynamic> event) {
+    final eventId = _readInt(event['eventId']);
     final eventName = event['name'] as String? ?? 'Event';
-    final selectedRating = _userRatings[eventName] ?? 0;
-    final selectedSuggestions = _selectedSuggestions[eventName] ?? <String>{};
-    final feedbackController = _feedbackControllerFor(eventName);
+    final eventKey = _eventKeyFor(event);
+    final savedRating = _readInt(event['myRating']) ?? 0;
+    final hasSubmittedRating = savedRating > 0;
+    final selectedRating = _userRatings[eventKey] ?? savedRating;
+    final selectedSuggestions = _selectedSuggestions[eventKey] ?? <String>{};
+    final feedbackController = _feedbackControllerFor(
+      eventKey,
+      initialText: (event['myComment'] as String? ?? ''),
+    );
+    final averageRating = _readDouble(event['rating']);
+    final reviewCount = _readInt(event['reviews']) ?? 0;
+    final averageStarCount = averageRating.floor().clamp(0, 5);
+    final ratingBreakdown = _readBreakdown(event['ratingBreakdown']);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -708,7 +754,7 @@ class _EventsScreenState extends State<EventsScreen>
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    event['rating'].toString(),
+                    averageRating.toStringAsFixed(1),
                     style: const TextStyle(
                       color: royalBlue,
                       fontSize: 30,
@@ -719,7 +765,7 @@ class _EventsScreenState extends State<EventsScreen>
                     children: List.generate(
                       5,
                       (index) => Icon(
-                        index < event['rating'].toInt()
+                        index < averageStarCount
                             ? Ionicons.star
                             : Ionicons.star_outline,
                         color: gold,
@@ -728,7 +774,7 @@ class _EventsScreenState extends State<EventsScreen>
                     ),
                   ),
                   Text(
-                    '(${event['reviews']} reviews)',
+                    '($reviewCount reviews)',
                     style: const TextStyle(color: darkGray, fontSize: 10),
                   ),
                 ],
@@ -736,7 +782,7 @@ class _EventsScreenState extends State<EventsScreen>
             ],
           ),
           const SizedBox(height: 12),
-          ..._buildRatingBreakdown(event['ratingBreakdown']),
+          ..._buildRatingBreakdown(ratingBreakdown),
           const SizedBox(height: 16),
           const Text(
             'Rate this event',
@@ -755,12 +801,14 @@ class _EventsScreenState extends State<EventsScreen>
                 (index) => Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: IconButton(
-                    onPressed: () {
-                      final rating = index + 1;
-                      setState(() {
-                        _userRatings[eventName] = rating;
-                      });
-                    },
+                    onPressed: hasSubmittedRating
+                        ? null
+                        : () {
+                            final rating = index + 1;
+                            setState(() {
+                              _userRatings[eventKey] = rating;
+                            });
+                          },
                     icon: Icon(
                       index < selectedRating
                           ? Ionicons.star
@@ -791,21 +839,23 @@ class _EventsScreenState extends State<EventsScreen>
               return ChoiceChip(
                 label: Text(suggestion),
                 selected: isSelected,
-                onSelected: (selected) {
-                  setState(() {
-                    final updatedSuggestions = Set<String>.from(
-                      _selectedSuggestions[eventName] ?? <String>{},
-                    );
+                onSelected: hasSubmittedRating
+                    ? null
+                    : (selected) {
+                        setState(() {
+                          final updatedSuggestions = Set<String>.from(
+                            _selectedSuggestions[eventKey] ?? <String>{},
+                          );
 
-                    if (selected) {
-                      updatedSuggestions.add(suggestion);
-                    } else {
-                      updatedSuggestions.remove(suggestion);
-                    }
+                          if (selected) {
+                            updatedSuggestions.add(suggestion);
+                          } else {
+                            updatedSuggestions.remove(suggestion);
+                          }
 
-                    _selectedSuggestions[eventName] = updatedSuggestions;
-                  });
-                },
+                          _selectedSuggestions[eventKey] = updatedSuggestions;
+                        });
+                      },
                 selectedColor: royalBlue.withOpacity(0.14),
                 backgroundColor: lightBlue.withOpacity(0.35),
                 side: BorderSide(
@@ -834,6 +884,7 @@ class _EventsScreenState extends State<EventsScreen>
             controller: feedbackController,
             minLines: 3,
             maxLines: 4,
+            enabled: !hasSubmittedRating,
             decoration: InputDecoration(
               hintText: 'Write your own comments about this event...',
               hintStyle: const TextStyle(
@@ -871,9 +922,11 @@ class _EventsScreenState extends State<EventsScreen>
               color: royalBlue.withOpacity(0.06),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Text(
-              'Your feedback helps improve future events.',
-              style: TextStyle(
+            child: Text(
+              hasSubmittedRating
+                  ? 'Rating already submitted. Editing is disabled for this event.'
+                  : 'Your feedback helps improve future events.',
+              style: const TextStyle(
                 color: darkGray,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -892,43 +945,184 @@ class _EventsScreenState extends State<EventsScreen>
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              onPressed: () {
-                if (selectedRating <= 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Please rate $eventName before submitting.',
-                      ),
-                    ),
-                  );
-                  return;
-                }
+              onPressed: hasSubmittedRating
+                  ? null
+                  : () async {
+                      if (eventId == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Unable to rate this event right now.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
 
-                final customFeedback = feedbackController.text.trim();
-                final selectedSuggestionText = selectedSuggestions.isEmpty
-                    ? 'No suggestion selected'
-                    : selectedSuggestions.join(', ');
-                final customFeedbackText = customFeedback.isEmpty
-                    ? 'No custom feedback'
-                    : customFeedback;
+                      if (selectedRating <= 0) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Please rate $eventName before submitting.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Rating submitted for $eventName: $selectedRating stars • $selectedSuggestionText • $customFeedbackText',
-                    ),
-                  ),
-                );
-              },
-              child: const Text(
-                'Submit Rating',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                      final customFeedback = feedbackController.text.trim();
+                      final selectedSuggestionText = selectedSuggestions.isEmpty
+                          ? 'No suggestion selected'
+                          : selectedSuggestions.join(', ');
+                      final commentForStorage = _buildStoredComment(
+                        customFeedback: customFeedback,
+                        selectedSuggestions: selectedSuggestions,
+                      );
+
+                      try {
+                        await EventRatingService.submitStudentRating(
+                          eventId: eventId,
+                          rating: selectedRating,
+                          comment: commentForStorage,
+                        );
+
+                        if (!mounted) {
+                          return;
+                        }
+
+                        _refreshRateEvents();
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Rating submitted for $eventName: $selectedRating stars • $selectedSuggestionText',
+                            ),
+                          ),
+                        );
+                      } on RatingAlreadySubmittedException {
+                        if (!mounted) {
+                          return;
+                        }
+
+                        _refreshRateEvents();
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'You already submitted a rating for this event.',
+                            ),
+                          ),
+                        );
+                      } catch (error) {
+                        if (!mounted) {
+                          return;
+                        }
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Failed to submit rating. ${error.toString()}',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+              child: Text(
+                hasSubmittedRating ? 'Rating Submitted' : 'Submit Rating',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _eventKeyFor(Map<String, dynamic> event) {
+    final eventId = _readInt(event['eventId'] ?? event['id']);
+    if (eventId != null) {
+      return 'event_$eventId';
+    }
+
+    return (event['name'] as String? ?? 'event_unknown').trim();
+  }
+
+  String _buildStoredComment({
+    required String customFeedback,
+    required Set<String> selectedSuggestions,
+  }) {
+    final trimmedFeedback = customFeedback.trim();
+    if (trimmedFeedback.isNotEmpty) {
+      return trimmedFeedback;
+    }
+
+    if (selectedSuggestions.isEmpty) {
+      return '';
+    }
+
+    return selectedSuggestions.join(', ');
+  }
+
+  int? _readInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
+    }
+
+    if (value is String) {
+      return int.tryParse(value.trim());
+    }
+
+    return null;
+  }
+
+  String? _readOptionalString(dynamic value) {
+    if (value is! String) {
+      return null;
+    }
+
+    final normalized = value.trim();
+    if (normalized.isEmpty) {
+      return null;
+    }
+
+    return normalized;
+  }
+
+  double _readDouble(dynamic value) {
+    if (value is double) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    if (value is String) {
+      return double.tryParse(value.trim()) ?? 0;
+    }
+
+    return 0;
+  }
+
+  Map<String, int> _readBreakdown(dynamic value) {
+    final empty = const <String, int>{'5': 0, '4': 0, '3': 0, '2': 0, '1': 0};
+    if (value is! Map) {
+      return empty;
+    }
+
+    final output = <String, int>{...empty};
+    for (final stars in output.keys.toList()) {
+      output[stars] = _readInt(value[stars]) ?? 0;
+    }
+
+    return output;
   }
 
   List<Widget> _buildRatingBreakdown(Map<String, int> breakdown) {
