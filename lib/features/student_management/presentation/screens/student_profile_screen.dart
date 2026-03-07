@@ -331,21 +331,6 @@ class _StudentProfileAdminScreenState extends State<StudentProfileAdminScreen> {
                           ),
                           const SizedBox(height: 12),
                           _buildActionCard(
-                            icon: Ionicons.calendar_outline,
-                            title: 'Event Attendance',
-                            subtitle: 'View event attendance history',
-                            onTap: () =>
-                                _showActionToast('View Event Attendance'),
-                          ),
-                          const SizedBox(height: 12),
-                          _buildActionCard(
-                            icon: Ionicons.wallet_outline,
-                            title: 'Payments',
-                            subtitle: 'Review payment history and status',
-                            onTap: () => _showActionToast('View Payments'),
-                          ),
-                          const SizedBox(height: 12),
-                          _buildActionCard(
                             icon: Ionicons.card_outline,
                             title: 'Activity Card',
                             subtitle: 'View student activity card details',

@@ -221,7 +221,7 @@ class _AppMainHeaderState extends State<AppMainHeader>
 
     if (normalized.contains('fee')) {
       return _SystemNotificationItem(
-        title: 'Fee Update',
+        title: 'Payments',
         body: message,
         target: NotificationNavigationTarget.payments,
       );
@@ -229,14 +229,14 @@ class _AppMainHeaderState extends State<AppMainHeader>
 
     if (normalized.contains('today')) {
       return _SystemNotificationItem(
-        title: 'Today\'s Events',
+        title: 'Events Today',
         body: message,
         target: NotificationNavigationTarget.todayEvents,
       );
     }
 
     return _SystemNotificationItem(
-      title: 'Event Update',
+      title: 'Events',
       body: message,
       target: NotificationNavigationTarget.events,
     );

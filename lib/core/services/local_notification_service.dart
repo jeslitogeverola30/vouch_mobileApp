@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../../features/auth/data/supabase_auth_service.dart';
@@ -18,8 +19,15 @@ class LocalNotificationService {
   static const String _channelName = 'Vouch Updates';
   static const String _channelDescription =
       'Alerts for new fees, new events, and today\'s events.';
+  static const String _updatesGroupKey = 'vouch_updates_group';
+  static const String _notificationSmallIcon =
+      '@drawable/ic_notification_vouch';
+  static const String _notificationLargeLogoAsset =
+      'assets/logos/vouch_logo.png';
   static const int _updatesNotificationId = 4101;
   static const Color _brandBlue = Color(0xFF003DA5);
+  static const Color _brandGold = Color(0xFFFFC107);
+  static const String _appLabel = 'Vouch';
 
   static const String _payloadFees = 'fees';
   static const String _payloadEvents = 'events';
@@ -32,6 +40,7 @@ class LocalNotificationService {
   int _nextNotificationId = _updatesNotificationId;
   GlobalKey<NavigatorState>? _navigatorKey;
   String? _pendingPayload;
+  Uint8List? _cachedLargeIconBytes;
 
   bool get isAndroidPlatform =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
@@ -52,7 +61,7 @@ class LocalNotificationService {
     }
 
     const androidInitialization = AndroidInitializationSettings(
-      '@mipmap/ic_launcher',
+      _notificationSmallIcon,
     );
 
     const initializationSettings = InitializationSettings(
@@ -120,8 +129,8 @@ class LocalNotificationService {
     required String body,
     required NotificationNavigationTarget target,
   }) async {
-    final normalizedTitle = title.trim();
-    final normalizedBody = body.trim();
+    final normalizedTitle = _sanitizeText(title);
+    final normalizedBody = _sanitizeText(body);
 
     if (normalizedTitle.isEmpty || normalizedBody.isEmpty) {
       return false;
@@ -139,6 +148,11 @@ class LocalNotificationService {
     }
 
     final payload = _payloadForTarget(target);
+    final visualSpec = _notificationVisualSpecForTarget(target);
+    final displayTitle = _resolveDisplayTitle(normalizedTitle, visualSpec);
+    final displayBody = _resolveDisplayBody(normalizedBody, visualSpec);
+    final largeIcon = await _loadLargeIconFromAssets();
+    final styleLines = <String>[displayBody, visualSpec.openHint];
 
     final notificationDetails = NotificationDetails(
       android: AndroidNotificationDetails(
@@ -147,21 +161,27 @@ class LocalNotificationService {
         channelDescription: _channelDescription,
         importance: Importance.max,
         priority: Priority.high,
-        color: _brandBlue,
+        color: visualSpec.accentColor,
         colorized: true,
-        styleInformation: BigTextStyleInformation(
-          normalizedBody,
-          contentTitle: '<b>$normalizedTitle</b>',
-          summaryText: 'Vouch',
+        styleInformation: InboxStyleInformation(
+          styleLines,
+          contentTitle: displayTitle,
+          summaryText: '$_appLabel • ${visualSpec.summaryText}',
         ),
+        icon: _notificationSmallIcon,
+        largeIcon: largeIcon,
+        subText: visualSpec.summaryText,
+        ticker: '$_appLabel ${visualSpec.summaryText}',
+        groupKey: _updatesGroupKey,
+        visibility: NotificationVisibility.public,
         category: AndroidNotificationCategory.reminder,
       ),
     );
 
     await _plugin.show(
       _nextNotificationId++,
-      normalizedTitle,
-      normalizedBody,
+      displayTitle,
+      displayBody,
       notificationDetails,
       payload: payload,
     );
@@ -197,6 +217,84 @@ class LocalNotificationService {
     }
 
     return _payloadEvents;
+  }
+
+  _NotificationVisualSpec _notificationVisualSpecForTarget(
+    NotificationNavigationTarget target,
+  ) {
+    if (target == NotificationNavigationTarget.payments) {
+      return const _NotificationVisualSpec(
+        accentColor: _brandGold,
+        summaryText: 'Payments',
+        openHint: 'Tap to open Payments.',
+      );
+    }
+
+    if (target == NotificationNavigationTarget.todayEvents) {
+      return const _NotificationVisualSpec(
+        accentColor: _brandBlue,
+        summaryText: 'Today\'s Events',
+        openHint: 'Tap to open Today\'s Events.',
+      );
+    }
+
+    return const _NotificationVisualSpec(
+      accentColor: _brandBlue,
+      summaryText: 'Events',
+      openHint: 'Tap to open Events.',
+    );
+  }
+
+  Future<AndroidBitmap<Object>?> _loadLargeIconFromAssets() async {
+    final cachedBytes = _cachedLargeIconBytes;
+    if (cachedBytes != null) {
+      return ByteArrayAndroidBitmap(cachedBytes);
+    }
+
+    try {
+      final byteData = await rootBundle.load(_notificationLargeLogoAsset);
+      final bytes = byteData.buffer.asUint8List();
+      _cachedLargeIconBytes = bytes;
+      return ByteArrayAndroidBitmap(bytes);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _sanitizeText(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+
+    final withoutHtmlTags = trimmed.replaceAll(RegExp(r'<[^>]*>'), ' ');
+    return withoutHtmlTags.replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  String _resolveDisplayTitle(
+    String title,
+    _NotificationVisualSpec visualSpec,
+  ) {
+    if (title.isEmpty) {
+      return '${visualSpec.summaryText} Update';
+    }
+
+    final normalizedTitle = title.toLowerCase();
+    final normalizedSummary = visualSpec.summaryText.toLowerCase();
+    if (normalizedTitle == normalizedSummary ||
+        normalizedTitle == '$normalizedSummary update') {
+      return '${visualSpec.summaryText} Update';
+    }
+
+    return title;
+  }
+
+  String _resolveDisplayBody(String body, _NotificationVisualSpec visualSpec) {
+    if (body.isEmpty) {
+      return visualSpec.openHint;
+    }
+
+    return body;
   }
 
   void _saveOrHandlePayload(String payload) {
@@ -283,4 +381,16 @@ class LocalNotificationService {
       arguments: 1,
     );
   }
+}
+
+class _NotificationVisualSpec {
+  const _NotificationVisualSpec({
+    required this.accentColor,
+    required this.summaryText,
+    required this.openHint,
+  });
+
+  final Color accentColor;
+  final String summaryText;
+  final String openHint;
 }
