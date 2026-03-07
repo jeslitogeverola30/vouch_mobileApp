@@ -45,6 +45,21 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
     });
   }
 
+  Future<void> _refreshHomeScreen() async {
+    if (mounted) {
+      setState(() {
+        _isLoadingTodayEvents = true;
+        _isLoadingStatistics = true;
+      });
+    }
+
+    await Future.wait<void>([
+      _loadTodayEvents(),
+      _loadStatistics(),
+      _loadStudentData(),
+    ]);
+  }
+
   Future<void> _loadTodayEvents() async {
     try {
       final events = await EventQueryService.fetchEvents();
@@ -223,19 +238,23 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
         if (widget.showChrome)
           AppMainHeader(onSearchTap: () => openGlobalHeaderSearch(context)),
         Expanded(
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildGreetingSection(),
-                const SizedBox(height: 24),
-                _buildTodaysEventSection(),
-                const SizedBox(height: 20),
-                _buildQuickActionsSection(),
-                const SizedBox(height: 24),
-                _buildStatisticsSection(),
-                const SizedBox(height: 20),
-              ],
+          child: RefreshIndicator(
+            onRefresh: _refreshHomeScreen,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildGreetingSection(),
+                  const SizedBox(height: 24),
+                  _buildTodaysEventSection(),
+                  const SizedBox(height: 20),
+                  _buildQuickActionsSection(),
+                  const SizedBox(height: 24),
+                  _buildStatisticsSection(),
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
           ),
         ),

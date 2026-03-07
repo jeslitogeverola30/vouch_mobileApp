@@ -4,6 +4,8 @@ import 'package:ionicons/ionicons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_router.dart';
+import '../services/app_notification_service.dart';
+import '../services/local_notification_service.dart';
 import '../services/avatar_sync_service.dart';
 import '../../features/auth/data/supabase_auth_service.dart';
 
@@ -25,15 +27,22 @@ class AppMainHeader extends StatefulWidget {
   State<AppMainHeader> createState() => _AppMainHeaderState();
 }
 
-class _AppMainHeaderState extends State<AppMainHeader> {
+class _AppMainHeaderState extends State<AppMainHeader>
+    with WidgetsBindingObserver {
   String? _resolvedAvatarUrl;
+  bool _isNotificationsEnabled = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
     _resolvedAvatarUrl = _normalizeAvatarUrl(widget.avatarUrl);
 
     AvatarSyncService.notifier.addListener(_onSyncedAvatarChanged);
+    AppNotificationService.instance.isEnabledListenable.addListener(
+      _onNotificationPreferenceChanged,
+    );
 
     if (_resolvedAvatarUrl == null) {
       final syncedAvatar = AvatarSyncService.notifier.value;
@@ -46,6 +55,8 @@ class _AppMainHeaderState extends State<AppMainHeader> {
     if (_resolvedAvatarUrl == null) {
       _loadAvatarFromSupabase();
     }
+
+    _initializeNotificationState();
   }
 
   @override
@@ -77,8 +88,158 @@ class _AppMainHeaderState extends State<AppMainHeader> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     AvatarSyncService.notifier.removeListener(_onSyncedAvatarChanged);
+    AppNotificationService.instance.isEnabledListenable.removeListener(
+      _onNotificationPreferenceChanged,
+    );
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _isNotificationsEnabled) {
+      _runNotificationUpdateCheck();
+    }
+  }
+
+  Future<void> _initializeNotificationState() async {
+    await AppNotificationService.instance.initialize();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isNotificationsEnabled = AppNotificationService.instance.isEnabled;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _runNotificationUpdateCheck();
+    });
+  }
+
+  void _onNotificationPreferenceChanged() {
+    final isEnabled = AppNotificationService.instance.isEnabled;
+    if (isEnabled == _isNotificationsEnabled || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isNotificationsEnabled = isEnabled;
+    });
+  }
+
+  Future<void> _toggleNotifications() async {
+    final enabled = await AppNotificationService.instance.toggleEnabled();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isNotificationsEnabled = enabled;
+    });
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            enabled ? 'Notifications turned on.' : 'Notifications turned off.',
+          ),
+        ),
+      );
+
+    if (enabled) {
+      final permissionGranted = await LocalNotificationService.instance
+          .requestPermissionIfNeeded();
+
+      if (!permissionGranted && mounted) {
+        final fallbackMessenger = ScaffoldMessenger.of(context);
+        fallbackMessenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Allow Android notification permission to receive system alerts.',
+              ),
+            ),
+          );
+      }
+
+      await _runNotificationUpdateCheck(force: true);
+    } else {
+      await LocalNotificationService.instance.cancelAll();
+    }
+  }
+
+  Future<void> _runNotificationUpdateCheck({bool force = false}) async {
+    final messages = await AppNotificationService.instance.checkForUpdates(
+      force: force,
+    );
+
+    if (!mounted || messages.isEmpty) {
+      return;
+    }
+
+    final notificationItems = messages
+        .map(_mapMessageToNotificationItem)
+        .toList(growable: false);
+
+    var didShowSystemNotification = false;
+    for (final item in notificationItems) {
+      final didShow = await LocalNotificationService.instance
+          .showUpdateNotification(
+            title: item.title,
+            body: item.body,
+            target: item.target,
+          );
+      didShowSystemNotification = didShowSystemNotification || didShow;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    if (didShowSystemNotification) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(messages.join('\n'))));
+  }
+
+  _SystemNotificationItem _mapMessageToNotificationItem(String message) {
+    final normalized = message.toLowerCase();
+
+    if (normalized.contains('fee')) {
+      return _SystemNotificationItem(
+        title: 'Payments',
+        body: message,
+        target: NotificationNavigationTarget.payments,
+      );
+    }
+
+    if (normalized.contains('today')) {
+      return _SystemNotificationItem(
+        title: 'Events Today',
+        body: message,
+        target: NotificationNavigationTarget.todayEvents,
+      );
+    }
+
+    return _SystemNotificationItem(
+      title: 'Events',
+      body: message,
+      target: NotificationNavigationTarget.events,
+    );
   }
 
   void _onSyncedAvatarChanged() {
@@ -238,11 +399,18 @@ class _AppMainHeaderState extends State<AppMainHeader> {
                 },
               ),
               IconButton(
-                icon: const Icon(
-                  Ionicons.notifications,
-                  color: Color(0xFF003DA5),
+                icon: Icon(
+                  _isNotificationsEnabled
+                      ? Ionicons.notifications
+                      : Ionicons.notifications_off,
+                  color: _isNotificationsEnabled
+                      ? const Color(0xFF003DA5)
+                      : const Color(0xFF003DA5).withValues(alpha: 0.38),
                 ),
-                onPressed: () {},
+                onPressed: _toggleNotifications,
+                tooltip: _isNotificationsEnabled
+                    ? 'Turn notifications off'
+                    : 'Turn notifications on',
               ),
               const SizedBox(width: 8),
               InkWell(
@@ -260,7 +428,7 @@ class _AppMainHeaderState extends State<AppMainHeader> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: const Color(0xFF003DA5).withOpacity(0.12),
+                      color: const Color(0xFF003DA5).withValues(alpha: 0.12),
                     ),
                   ),
                   child: ClipRRect(
@@ -275,4 +443,16 @@ class _AppMainHeaderState extends State<AppMainHeader> {
       ),
     );
   }
+}
+
+class _SystemNotificationItem {
+  const _SystemNotificationItem({
+    required this.title,
+    required this.body,
+    required this.target,
+  });
+
+  final String title;
+  final String body;
+  final NotificationNavigationTarget target;
 }

@@ -120,6 +120,10 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     }
   }
 
+  Future<void> _refreshPaymentsScreen() async {
+    await _loadCreatedFees();
+  }
+
   StudentPaymentItem _mapRequirementToItem(
     PaymentRequirementDetails fee,
     StudentTransactionRecord? transaction,
@@ -281,20 +285,24 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
         if (widget.showChrome)
           AppMainHeader(onSearchTap: () => openGlobalHeaderSearch(context)),
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSummaryCard(),
-                const SizedBox(height: 18),
-                _buildTabs(),
-                const SizedBox(height: 14),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildPaymentsContent(),
-                ),
-              ],
+          child: RefreshIndicator(
+            onRefresh: _refreshPaymentsScreen,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(bottom: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSummaryCard(),
+                  const SizedBox(height: 18),
+                  _buildTabs(),
+                  const SizedBox(height: 14),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: _buildPaymentsContent(),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

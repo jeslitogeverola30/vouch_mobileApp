@@ -86,11 +86,10 @@ class EventQueryService {
             ? null
             : _formatDisplayClock(snapshot!.scannedTimeOut!.toLocal());
 
-        final hasAnyScan = studentTimeIn != null || studentTimeOut != null;
+        final hasTimeIn = studentTimeIn != null;
+        final hasTimeOut = studentTimeOut != null;
         final attended =
-            hasAnyScan ||
-            snapshot?.status == 'present' ||
-            snapshot?.status == 'completed';
+            (hasTimeIn && hasTimeOut) || snapshot?.status == 'completed';
 
         return {
           ...event,

@@ -82,6 +82,23 @@ class _EventsScreenState extends State<EventsScreen>
     });
   }
 
+  Future<void> _refreshEvents() async {
+    final eventsFuture = EventQueryService.fetchEventsForCurrentStudent();
+    final rateEventsFuture = EventRatingService.fetchStudentRateEvents();
+
+    if (mounted) {
+      setState(() {
+        _eventsFuture = eventsFuture;
+        _rateEventsFuture = rateEventsFuture;
+      });
+    }
+
+    await Future.wait<List<Map<String, dynamic>>>([
+      eventsFuture,
+      rateEventsFuture,
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme);
@@ -172,34 +189,37 @@ class _EventsScreenState extends State<EventsScreen>
         ),
         const SizedBox(height: 10),
         Expanded(
-          child: FutureBuilder<List<Map<String, dynamic>>>(
-            future: _eventsFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
+          child: RefreshIndicator(
+            onRefresh: _refreshEvents,
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: _eventsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-              if (snapshot.hasError) {
-                return _buildNoEventsState(
-                  'Failed to load events. Please try again later.',
+                if (snapshot.hasError) {
+                  return _buildNoEventsState(
+                    'Failed to load events. Please try again later.',
+                  );
+                }
+
+                final events = snapshot.data ?? const <Map<String, dynamic>>[];
+                final todayEvents = EventQueryService.todayEvents(events);
+                final upcomingEvents = EventQueryService.upcomingEvents(events);
+                final pastEvents = EventQueryService.pastEvents(events);
+
+                return TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildTodayTab(todayEvents),
+                    _buildUpcomingTab(upcomingEvents),
+                    _buildPastTab(pastEvents),
+                    _buildRateTab(),
+                  ],
                 );
-              }
-
-              final events = snapshot.data ?? const <Map<String, dynamic>>[];
-              final todayEvents = EventQueryService.todayEvents(events);
-              final upcomingEvents = EventQueryService.upcomingEvents(events);
-              final pastEvents = EventQueryService.pastEvents(events);
-
-              return TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildTodayTab(todayEvents),
-                  _buildUpcomingTab(upcomingEvents),
-                  _buildPastTab(pastEvents),
-                  _buildRateTab(),
-                ],
-              );
-            },
+              },
+            ),
           ),
         ),
       ],
@@ -242,6 +262,7 @@ class _EventsScreenState extends State<EventsScreen>
     }
 
     return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       child: Column(
         children: todayEvents.map(_buildUpcomingEventCard).toList(),
@@ -255,6 +276,7 @@ class _EventsScreenState extends State<EventsScreen>
     }
 
     return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       child: Column(
         children: upcomingEvents
@@ -487,6 +509,7 @@ class _EventsScreenState extends State<EventsScreen>
     }
 
     return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       child: Column(
         children: pastEvents
@@ -614,26 +637,34 @@ class _EventsScreenState extends State<EventsScreen>
   }
 
   Widget _buildNoEventsState(String message) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Ionicons.calendar_clear_outline,
-            color: darkGray,
-            size: 52,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            style: const TextStyle(
-              color: darkGray,
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(
+          height: 320,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Ionicons.calendar_clear_outline,
+                  color: darkGray,
+                  size: 52,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  message,
+                  style: const TextStyle(
+                    color: darkGray,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -683,6 +714,7 @@ class _EventsScreenState extends State<EventsScreen>
         }
 
         return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           child: Column(
             children: rateEvents

@@ -21,7 +21,18 @@ class SupabaseStudentManagementImpl implements StudentManagementRepository {
         )
         .order('full_name', ascending: true);
 
-    return List<Map<String, dynamic>>.from(response).map(_mapStudent).toList();
+    final adminEmails = await _fetchAdminEmails();
+
+    final studentRows = List<Map<String, dynamic>>.from(response).where((row) {
+      final email = _normalizeEmail(row['email']);
+      if (email.isEmpty) {
+        return true;
+      }
+
+      return !adminEmails.contains(email);
+    });
+
+    return studentRows.map(_mapStudent).toList();
   }
 
   @override
@@ -116,6 +127,23 @@ class SupabaseStudentManagementImpl implements StudentManagementRepository {
 
   String _readString(dynamic value) {
     return value?.toString().trim() ?? '';
+  }
+
+  String _normalizeEmail(dynamic value) {
+    return _readString(value).toLowerCase();
+  }
+
+  Future<Set<String>> _fetchAdminEmails() async {
+    try {
+      final response = await _client.from('admins').select('email');
+
+      return List<Map<String, dynamic>>.from(response)
+          .map((row) => _normalizeEmail(row['email']))
+          .where((email) => email.isNotEmpty)
+          .toSet();
+    } catch (_) {
+      return const <String>{};
+    }
   }
 
   List<String> _normalizeStudentIds(List<String> studentIds) {

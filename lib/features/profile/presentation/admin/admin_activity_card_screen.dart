@@ -3,11 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../../core/data/local/database_helper.dart';
 import '../../../../core/services/avatar_sync_service.dart';
 import '../../../auth/data/supabase_auth_service.dart';
 import '../../../student_management/data/academic_term_service.dart';
-import '../../data/supabase_profile_repository_impl.dart';
+import '../../data/supabase_admin_profile_repository_impl.dart';
 
 const Color royalBlue = Color(0xFF003DA5);
 const Color gold = Color(0xFFFFC107);
@@ -20,9 +19,9 @@ class ActivityCardScreen extends StatefulWidget {
 }
 
 class _ActivityCardScreenState extends State<ActivityCardScreen> {
-  String _studentName = '';
-  String _studentProgram = '';
-  String _studentId = '';
+  String _adminName = '';
+  String _adminFaculty = '';
+  String _adminId = '';
   String _avatarUrl = '';
 
   static const int _maxItemsPerRow = 8;
@@ -31,10 +30,8 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
   static const String _requirementsView = 'obligatory_requirements';
   static const String _eventsTable = 'events';
   static const String _paymentRequirementsTable = 'payment_requirements';
-  static const String _studentsTable = 'students';
-  static const String _eventAttendanceTable = 'event_attendance';
-  static const String _transactionsTable = 'student_transactions';
-  static const String _activityCardsTable = 'activity_cards';
+  static const String _adminsTable = 'admins';
+  static const String _adminActivityCardsTable = 'admin_activity_cards';
 
   static const String _eventRequirementType = 'event';
   static const String _paymentRequirementType = 'payment';
@@ -42,6 +39,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
   List<(String, bool)> _rowOneActivities = const [];
   List<(String, bool)> _rowTwoActivities = const [];
   bool _isOfficiallyCleared = false;
+  bool _isStampingCard = false;
   bool _isStampedByAdmin = false;
   AcademicTermOption? _activeAcademicTerm;
 
@@ -56,7 +54,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadStudentProfile();
+      _loadAdminProfile();
       _initializeCardData();
     });
   }
@@ -66,86 +64,71 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
     await _loadObligatoryActivities();
   }
 
-  Future<void> _loadStudentProfile() async {
+  Future<void> _loadAdminProfile() async {
     final currentUser = SupabaseAuthService.currentUser;
     final email = _readLabel(currentUser?.email);
     final metadata = currentUser?.userMetadata ?? const <String, dynamic>{};
 
-    final localStudentData = <String, dynamic>{};
-    final remoteStudentData = <String, dynamic>{};
-    final profileStudentData = <String, dynamic>{};
-    final student = <String, dynamic>{};
+    final admin = <String, dynamic>{};
+    var avatarFromProfileRepo = '';
 
     try {
-      final profile = await SupabaseProfileRepositoryImpl.instance
-          .getCurrentUserProfile();
-      if (profile != null) {
-        profileStudentData.addAll(profile.toMap());
+      final avatar = await SupabaseAdminProfileRepositoryImpl.instance
+          .getCurrentAvatarUrl();
+      if (avatar != null) {
+        avatarFromProfileRepo = _readLabel(avatar);
       }
     } catch (_) {
-      // Ignore and continue with other fallbacks.
+      // Ignore and continue with table lookup.
     }
 
     if (email.isNotEmpty) {
       try {
-        final remoteStudentRow = await Supabase.instance.client
-            .from(_studentsTable)
-            .select('email, full_name, student_id, program, profile_photo_url')
+        final remoteAdminRow = await Supabase.instance.client
+            .from(_adminsTable)
+            .select('id, email, full_name, faculty, profile_photo_url')
             .ilike('email', email)
             .maybeSingle();
-        if (remoteStudentRow != null) {
-          remoteStudentData.addAll(Map<String, dynamic>.from(remoteStudentRow));
+        if (remoteAdminRow != null) {
+          admin.addAll(Map<String, dynamic>.from(remoteAdminRow));
         }
       } catch (_) {
-        // Ignore and continue with local DB fallback.
-      }
-
-      final localStudentRow = await DatabaseHelper.instance.getStudentByEmail(
-        email,
-      );
-      if (localStudentRow != null) {
-        localStudentData.addAll(localStudentRow);
+        // Ignore and continue with metadata fallback.
       }
     }
 
-    student
-      ..addAll(localStudentData)
-      ..addAll(remoteStudentData)
-      ..addAll(profileStudentData);
-
     final resolvedName = _firstNonEmpty([
-      student['full_name'],
-      student['fullName'],
+      admin['full_name'],
+      admin['fullName'],
       metadata['full_name'],
       _metadataCombinedName(metadata),
-      'Student',
+      'Admin',
     ]);
-    final resolvedProgram = _firstNonEmpty([
-      student['program'],
-      metadata['program'],
+    final resolvedFaculty = _firstNonEmpty([
+      admin['faculty'],
+      metadata['faculty'],
       'N/A',
     ]);
-    final resolvedStudentId = _firstNonEmpty([
-      student['student_id'],
-      student['studentId'],
-      metadata['student_id'],
-      'N/A',
-    ]);
+    final adminIdValue = _firstNonEmpty([admin['id'], metadata['admin_id']]);
+    final resolvedAdminId = adminIdValue.isEmpty
+        ? 'Admin ID: N/A'
+        : 'Admin ID: $adminIdValue';
     final resolvedAvatarUrl = _firstNonEmpty([
-      student['profile_photo_url'],
-      student['profilePhotoUrl'],
+      admin['profile_photo_url'],
+      admin['profilePhotoUrl'],
       _avatarUrl,
+      avatarFromProfileRepo,
     ]);
-    final resolvedEmail = _firstNonEmpty([student['email'], email]);
+    final resolvedEmail = _firstNonEmpty([admin['email'], email]);
 
     if (!mounted) {
       return;
     }
 
     setState(() {
-      _studentName = resolvedName;
-      _studentProgram = resolvedProgram;
-      _studentId = resolvedStudentId;
+      _adminName = resolvedName;
+      _adminFaculty = resolvedFaculty;
+      _adminId = resolvedAdminId;
       _avatarUrl = resolvedAvatarUrl;
     });
 
@@ -221,10 +204,10 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
       final termId = _activeAcademicTerm?.id ?? 0;
       if (termId > 0) {
         try {
-          final studentId = await _resolveCurrentStudentIdOrEmpty();
-          if (studentId.isNotEmpty) {
-            stampState = await _fetchActivityCardStampState(
-              studentId: studentId,
+          final adminId = await _resolveCurrentAdminIdOrZero();
+          if (adminId > 0) {
+            stampState = await _fetchAdminActivityCardStampState(
+              adminId: adminId,
               termId: termId,
             );
           }
@@ -248,60 +231,155 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
   bool get _shouldShowOfficialStamp =>
       _isOfficiallyCleared && _isStampedByAdmin;
 
+  Future<void> _onStampCardPressed() async {
+    if (_isStampingCard) {
+      return;
+    }
+
+    if (!_isOfficiallyCleared) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'All mandatory requirements must be cleared before stamping.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final activeTermId = _activeAcademicTerm?.id ?? 0;
+    if (activeTermId <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No active academic term available.')),
+      );
+      return;
+    }
+
+    final adminId = await _resolveCurrentAdminIdOrZero();
+    if (adminId <= 0) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to resolve admin account.')),
+      );
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isStampingCard = true;
+    });
+
+    try {
+      await _stampAdminActivityCardForTerm(
+        adminId: adminId,
+        termId: activeTermId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isStampedByAdmin = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Activity card stamped successfully.')),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to stamp activity card.')),
+      );
+    } finally {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isStampingCard = false;
+      });
+    }
+  }
+
+  Future<bool> _fetchAdminActivityCardStampState({
+    required int adminId,
+    required int termId,
+  }) async {
+    final response = await Supabase.instance.client
+        .from(_adminActivityCardsTable)
+        .select('is_stamp')
+        .eq('admin_id', adminId)
+        .eq('term_id', termId)
+        .maybeSingle();
+
+    if (response == null) {
+      return false;
+    }
+
+    final stampValue = response['is_stamp'];
+    if (stampValue is bool) {
+      return stampValue;
+    }
+
+    return _readLabel(stampValue).toLowerCase() == 'true';
+  }
+
+  Future<void> _stampAdminActivityCardForTerm({
+    required int adminId,
+    required int termId,
+  }) async {
+    await Supabase.instance.client.from(_adminActivityCardsTable).upsert({
+      'admin_id': adminId,
+      'term_id': termId,
+      'is_stamp': true,
+    }, onConflict: 'admin_id,term_id');
+  }
+
+  Future<int> _resolveCurrentAdminIdOrZero() async {
+    final user = SupabaseAuthService.currentUser;
+    final metadata = user?.userMetadata ?? const <String, dynamic>{};
+    final metadataAdminId = _readInt(metadata['admin_id']);
+    if (metadataAdminId > 0) {
+      return metadataAdminId;
+    }
+
+    final visibleAdminId = _readInt(_adminId.replaceFirst('Admin ID:', ''));
+    if (visibleAdminId > 0) {
+      return visibleAdminId;
+    }
+
+    final email = _readLabel(user?.email);
+    if (email.isEmpty) {
+      return 0;
+    }
+
+    try {
+      final row = await Supabase.instance.client
+          .from(_adminsTable)
+          .select('id')
+          .ilike('email', email)
+          .maybeSingle();
+      return _readInt(row?['id']);
+    } catch (_) {
+      return 0;
+    }
+  }
+
   Future<List<(String, bool)>> _buildActivityItems(
     List<_ObligatoryActivity> requirements,
   ) async {
-    if (requirements.isEmpty) {
-      return const [];
-    }
-
-    final studentId = await _resolveCurrentStudentIdOrEmpty();
-    if (studentId.isEmpty) {
-      return requirements
-          .map<(String, bool)>((item) => (item.label, false))
-          .toList(growable: false);
-    }
-
-    final eventRequirementIds = requirements
-        .where((item) => item.type == _eventRequirementType)
-        .map((item) => item.sourceId)
-        .toSet()
-        .toList(growable: false);
-
-    final paymentRequirementIds = requirements
-        .where((item) => item.type == _paymentRequirementType)
-        .map((item) => item.sourceId)
-        .toSet()
-        .toList(growable: false);
-
-    Set<int> activeEventIds = const <int>{};
-    Set<int> activePaymentIds = const <int>{};
-
-    try {
-      activeEventIds = await _fetchActiveEventIds(
-        studentId,
-        eventRequirementIds,
-      );
-    } catch (_) {
-      activeEventIds = const <int>{};
-    }
-
-    try {
-      activePaymentIds = await _fetchActivePaymentRequirementIds(
-        studentId,
-        paymentRequirementIds,
-      );
-    } catch (_) {
-      activePaymentIds = const <int>{};
-    }
-
     return requirements
-        .map((item) {
-          final active = item.type == _eventRequirementType
-              ? activeEventIds.contains(item.sourceId)
-              : activePaymentIds.contains(item.sourceId);
-          return (item.label, active);
-        })
+        .map<(String, bool)>((item) => (item.label, true))
         .take(_maxItemsTotal)
         .toList(growable: false);
   }
@@ -401,133 +479,6 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
         .toList(growable: false);
   }
 
-  Future<Set<int>> _fetchActiveEventIds(
-    String studentId,
-    List<int> eventIds,
-  ) async {
-    if (eventIds.isEmpty) {
-      return const <int>{};
-    }
-
-    final response = await Supabase.instance.client
-        .from(_eventAttendanceTable)
-        .select('event_id, scanned_time_in, scanned_time_out, status')
-        .eq('student_id', studentId)
-        .inFilter('event_id', eventIds);
-
-    final rows = List<Map<String, dynamic>>.from(response);
-    final activeEventIds = <int>{};
-
-    for (final row in rows) {
-      final eventId = _readInt(row['event_id']);
-      if (eventId <= 0) {
-        continue;
-      }
-
-      final status = _readLabel(row['status']).toLowerCase();
-      final hasTimeIn = _readLabel(row['scanned_time_in']).isNotEmpty;
-      final hasTimeOut = _readLabel(row['scanned_time_out']).isNotEmpty;
-      final isCompleted = status == 'completed' || (hasTimeIn && hasTimeOut);
-
-      if (isCompleted) {
-        activeEventIds.add(eventId);
-      }
-    }
-
-    return activeEventIds;
-  }
-
-  Future<Set<int>> _fetchActivePaymentRequirementIds(
-    String studentId,
-    List<int> requirementIds,
-  ) async {
-    if (requirementIds.isEmpty) {
-      return const <int>{};
-    }
-
-    final response = await Supabase.instance.client
-        .from(_transactionsTable)
-        .select('requirement_id, status')
-        .eq('student_id', studentId)
-        .inFilter('requirement_id', requirementIds);
-
-    final rows = List<Map<String, dynamic>>.from(response);
-    final activeRequirementIds = <int>{};
-
-    for (final row in rows) {
-      final requirementId = _readInt(row['requirement_id']);
-      if (requirementId <= 0) {
-        continue;
-      }
-
-      final status = _readLabel(row['status']).toLowerCase();
-      final isRejected = status == 'rejected' || status == 'declined';
-      if (!isRejected) {
-        activeRequirementIds.add(requirementId);
-      }
-    }
-
-    return activeRequirementIds;
-  }
-
-  Future<bool> _fetchActivityCardStampState({
-    required String studentId,
-    required int termId,
-  }) async {
-    final response = await Supabase.instance.client
-        .from(_activityCardsTable)
-        .select('is_stamp')
-        .eq('student_id', studentId)
-        .eq('term_id', termId)
-        .maybeSingle();
-
-    if (response == null) {
-      return false;
-    }
-
-    final stampValue = response['is_stamp'];
-    if (stampValue is bool) {
-      return stampValue;
-    }
-
-    return _readLabel(stampValue).toLowerCase() == 'true';
-  }
-
-  Future<String> _resolveCurrentStudentIdOrEmpty() async {
-    try {
-      final profile = await SupabaseProfileRepositoryImpl.instance
-          .getCurrentUserProfile();
-      final studentId = _readLabel(profile?.studentId);
-      if (studentId.isNotEmpty) {
-        return studentId;
-      }
-    } catch (_) {
-      // Ignore and continue with fallback resolvers.
-    }
-
-    final user = SupabaseAuthService.currentUser;
-    final metadataStudentId = _readLabel(user?.userMetadata?['student_id']);
-    if (metadataStudentId.isNotEmpty) {
-      return metadataStudentId;
-    }
-
-    final email = _readLabel(user?.email);
-    if (email.isEmpty) {
-      return '';
-    }
-
-    try {
-      final student = await Supabase.instance.client
-          .from(_studentsTable)
-          .select('student_id')
-          .ilike('email', email)
-          .maybeSingle();
-      return _readLabel(student?['student_id']);
-    } catch (_) {
-      return '';
-    }
-  }
-
   String _normalizeRequirementType(dynamic value) {
     final normalized = _readLabel(value).toLowerCase();
     if (normalized.startsWith('event')) {
@@ -578,7 +529,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
     return value?.toString().trim() ?? '';
   }
 
-  Widget _buildStudentAvatarImage() {
+  Widget _buildAdminAvatarImage() {
     if (_avatarUrl.isNotEmpty) {
       return Image.network(
         _avatarUrl,
@@ -607,11 +558,32 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme);
+    final isStampedByAdmin = _isStampedByAdmin;
 
     return Theme(
       data: Theme.of(context).copyWith(textTheme: textTheme),
       child: Scaffold(
         backgroundColor: Colors.white,
+        floatingActionButton: FloatingActionButton(
+          onPressed: _isStampingCard ? null : _onStampCardPressed,
+          tooltip: _isStampingCard
+              ? 'Stamping activity cards...'
+              : isStampedByAdmin
+              ? 'Card already stamped'
+              : 'Stamp activity card',
+          backgroundColor: isStampedByAdmin ? royalBlue : gold,
+          foregroundColor: isStampedByAdmin ? gold : royalBlue,
+          child: _isStampingCard
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(
+                  isStampedByAdmin ? Ionicons.ribbon : Ionicons.ribbon_outline,
+                ),
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         body: Stack(
           children: [
             Positioned(
@@ -795,7 +767,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
                         width: 130,
                         height: 130,
                         color: royalBlue,
-                        child: _buildStudentAvatarImage(),
+                        child: _buildAdminAvatarImage(),
                       ),
                     ),
                     const SizedBox(width: 15),
@@ -806,7 +778,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            _studentName,
+                            _adminName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -818,7 +790,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            _studentProgram,
+                            _adminFaculty,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -829,7 +801,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            _studentId,
+                            _adminId,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(

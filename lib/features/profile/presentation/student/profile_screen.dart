@@ -12,6 +12,7 @@ import '../../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../../core/widgets/app_main_header.dart';
 import '../../../../core/config/app_router.dart';
 import '../../../auth/data/supabase_auth_service.dart';
+import '../../../student_management/data/academic_term_service.dart';
 import '../../data/profile_image_upload_service.dart';
 import '../../data/supabase_profile_repository_impl.dart';
 
@@ -49,6 +50,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _selectedIndex = 4;
   bool _isLoggingOut = false;
   bool _isUploadingAvatar = false;
+  bool _isLoadingAcademicTerm = true;
 
   late String _userName;
   late String _userEmail;
@@ -56,6 +58,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late String _faculty;
   late String _program;
   String _avatarUrl = '';
+  AcademicTermOption? _activeAcademicTerm;
 
   @override
   void initState() {
@@ -68,6 +71,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadProfile();
+      _loadAcademicTerm();
     });
   }
 
@@ -99,6 +103,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     AvatarSyncService.setAvatar(email: _userEmail, avatarUrl: _avatarUrl);
+  }
+
+  Future<void> _loadAcademicTerm() async {
+    List<AcademicTermOption> terms = const <AcademicTermOption>[];
+
+    try {
+      terms = await AcademicTermService.fetchTerms();
+    } catch (_) {
+      terms = const <AcademicTermOption>[];
+    }
+
+    AcademicTermOption? activeTerm;
+    for (final term in terms) {
+      if (term.isActive) {
+        activeTerm = term;
+        break;
+      }
+    }
+
+    activeTerm ??= terms.isNotEmpty ? terms.first : null;
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _activeAcademicTerm = activeTerm;
+      _isLoadingAcademicTerm = false;
+    });
+  }
+
+  String get _academicTermLabel {
+    if (_isLoadingAcademicTerm) {
+      return 'Loading...';
+    }
+
+    return _activeAcademicTerm?.label ?? 'No active term set';
+  }
+
+  Future<void> _refreshProfileScreen() async {
+    if (mounted) {
+      setState(() {
+        _isLoadingAcademicTerm = true;
+      });
+    }
+
+    await Future.wait<void>([_loadProfile(), _loadAcademicTerm()]);
   }
 
   Future<void> _showAvatarActions() async {
@@ -523,101 +574,114 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onSearchTap: () => openGlobalHeaderSearch(context),
           ),
         Expanded(
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildProfileSummaryCard(),
-                ),
-                const SizedBox(height: 22),
-                _buildSectionHeader(
-                  title: 'Academic Details',
-                  subtitle: 'Your student profile information',
-                ),
-                const SizedBox(height: 12),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    children: [
-                      _buildInfoCard(
-                        icon: Ionicons.card_outline,
-                        label: 'Student ID',
-                        value: _studentId,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildInfoCard(
-                        icon: Ionicons.people,
-                        label: 'Faculty',
-                        value: _faculty,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildInfoCard(
-                        icon: Ionicons.school_outline,
-                        label: 'Program',
-                        value: _program,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildAccountActionButton(
-                        icon: Ionicons.document_outline,
-                        title: 'View Activity Card',
-                        subtitle: 'See your student activity details',
-                        onTap: () {
-                          Navigator.pushNamed(context, AppRouter.activityCard);
-                        },
-                      ),
-                    ],
+          child: RefreshIndicator(
+            onRefresh: _refreshProfileScreen,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: _buildProfileSummaryCard(),
                   ),
-                ),
-                const SizedBox(height: 22),
-                _buildSectionHeader(
-                  title: 'Account',
-                  subtitle: 'Manage your login and security settings',
-                ),
-                const SizedBox(height: 12),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    children: [
-                      _buildAccountActionButton(
-                        icon: Ionicons.mail_outline,
-                        title: 'Change Email',
-                        subtitle: 'Update your account email address',
-                        onTap: () {
-                          Navigator.pushNamed(
-                            context,
-                            AppRouter.sensitiveReauth,
-                            arguments: AppRouter.changeEmail,
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _buildAccountActionButton(
-                        icon: Ionicons.lock_closed_outline,
-                        title: 'Change Password',
-                        subtitle: 'Secure your account with a new password',
-                        onTap: () {
-                          Navigator.pushNamed(
-                            context,
-                            AppRouter.sensitiveReauth,
-                            arguments: AppRouter.changePassword,
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _buildAccountActionButton(
-                        icon: Ionicons.log_out_outline,
-                        title: 'Logout',
-                        subtitle: 'Sign out from this device',
-                        onTap: _handleLogout,
-                        isDestructive: true,
-                      ),
-                      const SizedBox(height: 34),
-                    ],
+                  const SizedBox(height: 22),
+                  _buildSectionHeader(
+                    title: 'Academic Details',
+                    subtitle: 'Your student profile information',
                   ),
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      children: [
+                        _buildInfoCard(
+                          icon: Ionicons.card_outline,
+                          label: 'Student ID',
+                          value: _studentId,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildInfoCard(
+                          icon: Ionicons.calendar_outline,
+                          label: 'Academic Term',
+                          value: _academicTermLabel,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildInfoCard(
+                          icon: Ionicons.people,
+                          label: 'Faculty',
+                          value: _faculty,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildInfoCard(
+                          icon: Ionicons.school_outline,
+                          label: 'Program',
+                          value: _program,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildAccountActionButton(
+                          icon: Ionicons.document_outline,
+                          title: 'View Activity Card',
+                          subtitle: 'See your student activity details',
+                          onTap: () {
+                            Navigator.pushNamed(
+                              context,
+                              AppRouter.activityCard,
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  _buildSectionHeader(
+                    title: 'Account',
+                    subtitle: 'Manage your login and security settings',
+                  ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      children: [
+                        _buildAccountActionButton(
+                          icon: Ionicons.mail_outline,
+                          title: 'Change Email',
+                          subtitle: 'Update your account email address',
+                          onTap: () {
+                            Navigator.pushNamed(
+                              context,
+                              AppRouter.sensitiveReauth,
+                              arguments: AppRouter.changeEmail,
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _buildAccountActionButton(
+                          icon: Ionicons.lock_closed_outline,
+                          title: 'Change Password',
+                          subtitle: 'Secure your account with a new password',
+                          onTap: () {
+                            Navigator.pushNamed(
+                              context,
+                              AppRouter.sensitiveReauth,
+                              arguments: AppRouter.changePassword,
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _buildAccountActionButton(
+                          icon: Ionicons.log_out_outline,
+                          title: 'Logout',
+                          subtitle: 'Sign out from this device',
+                          onTap: _handleLogout,
+                          isDestructive: true,
+                        ),
+                        const SizedBox(height: 34),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

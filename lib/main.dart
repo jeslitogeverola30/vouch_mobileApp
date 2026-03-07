@@ -2,14 +2,19 @@ import 'package:flutter/material.dart';
 
 import 'core/config/app_router.dart';
 import 'core/config/app_strings.dart';
+import 'core/services/local_notification_service.dart';
 import 'core/services/supabase_client.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/data/supabase_auth_service.dart';
+
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await SupabaseClientService.initialize();
+  await LocalNotificationService.instance.initialize();
+  LocalNotificationService.instance.attachNavigatorKey(appNavigatorKey);
 
   runApp(const VouchMobileApp());
 }
@@ -20,6 +25,7 @@ class VouchMobileApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: appNavigatorKey,
       title: AppStrings.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),

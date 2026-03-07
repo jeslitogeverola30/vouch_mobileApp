@@ -98,6 +98,7 @@ class PaymentRequirementService {
       PaymentRequirementService._();
 
   static const String _tableName = 'payment_requirements';
+  static const String _academicTermsTable = 'academic_terms';
 
   final SupabaseClient _client = Supabase.instance.client;
 
@@ -168,10 +169,12 @@ class PaymentRequirementService {
     }
 
     final adminId = await _resolveCurrentAdminId();
+    final termId = await _resolveActiveTermId();
 
     final response = await _client
         .from(_tableName)
         .insert({
+          'term_id': termId,
           'title': normalizedTitle,
           'description': normalizedDescription.isNotEmpty
               ? normalizedDescription
@@ -226,5 +229,52 @@ class PaymentRequirementService {
     }
 
     throw StateError('Admin account not found.');
+  }
+
+  Future<int> _resolveActiveTermId() async {
+    final activeTerm = await _client
+        .from(_academicTermsTable)
+        .select('id')
+        .eq('is_active', true)
+        .order('id', ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+    final activeTermId = _readInt(activeTerm?['id']);
+    if (activeTermId > 0) {
+      return activeTermId;
+    }
+
+    final fallbackTerm = await _client
+        .from(_academicTermsTable)
+        .select('id')
+        .order('id', ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+    final fallbackTermId = _readInt(fallbackTerm?['id']);
+    if (fallbackTermId > 0) {
+      return fallbackTermId;
+    }
+
+    throw StateError(
+      'No academic term found. Please add an academic term first.',
+    );
+  }
+
+  int _readInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
+    }
+
+    if (value is String) {
+      return int.tryParse(value.trim()) ?? 0;
+    }
+
+    return 0;
   }
 }

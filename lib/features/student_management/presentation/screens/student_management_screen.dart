@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../data/academic_term_service.dart';
 import '../../data/supabase_student_management_impl.dart';
+import '../../../auth/data/supabase_auth_service.dart';
 import '../../domain/student_directory_query.dart';
 import '../../domain/student_entity.dart';
 import '../../domain/student_management_repository.dart';
@@ -20,6 +23,16 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
   final StudentManagementRepository _studentRepository =
       SupabaseStudentManagementImpl.instance;
   static const String _allProgramsLabel = 'All';
+  static const String _clearedTabLabel = 'Cleared';
+
+  static const String _adminsTable = 'admins';
+  static const String _eventsTable = 'events';
+  static const String _paymentRequirementsTable = 'payment_requirements';
+  static const String _eventAttendanceTable = 'event_attendance';
+  static const String _transactionsTable = 'student_transactions';
+  static const String _activityCardsTable = 'activity_cards';
+  static const String _adminActivityCardsTable = 'admin_activity_cards';
+
   String _selectedTab = 'All';
   String _selectedProgram = _allProgramsLabel;
 
@@ -28,7 +41,18 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
   String? _studentsLoadError;
   bool _isSelectionMode = false;
   bool _isBulkActionRunning = false;
+  bool _isAdminActivityCardStamped = false;
+  bool _isLoadingAcademicTerms = true;
   final Set<String> _selectedStudentIds = <String>{};
+  Set<String> _clearedStudentIds = <String>{};
+  List<AcademicTermOption> _academicTerms = const <AcademicTermOption>[];
+  AcademicTermOption? _activeAcademicTerm;
+
+  static const List<String> _semesterOptions = <String>[
+    '1st Semester',
+    '2nd Semester',
+    'Summer',
+  ];
 
   List<String> get _facetPrograms {
     final programs =
@@ -51,6 +75,52 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
       }
     });
     _loadStudents();
+    _loadAcademicTerms();
+  }
+
+  Future<void> _loadAcademicTerms() async {
+    final previousActiveTermId = _activeAcademicTerm?.id ?? 0;
+    List<AcademicTermOption> terms = const <AcademicTermOption>[];
+
+    try {
+      terms = await AcademicTermService.fetchTerms();
+    } catch (_) {
+      terms = const <AcademicTermOption>[];
+    }
+
+    AcademicTermOption? activeTerm;
+    for (final term in terms) {
+      if (term.isActive) {
+        activeTerm = term;
+        break;
+      }
+    }
+
+    if (activeTerm == null && terms.isNotEmpty) {
+      activeTerm = terms.first;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    final nextActiveTermId = activeTerm?.id ?? 0;
+    final didChangeActiveTerm = previousActiveTermId != nextActiveTermId;
+
+    setState(() {
+      _academicTerms = terms;
+      _activeAcademicTerm = activeTerm;
+      _isLoadingAcademicTerms = false;
+
+      if (didChangeActiveTerm) {
+        _clearedStudentIds = <String>{};
+        _isAdminActivityCardStamped = false;
+        _selectedStudentIds.clear();
+        _isSelectionMode = false;
+      }
+    });
+
+    await _refreshClearanceAndAdminStampState();
   }
 
   Future<void> _loadStudents() async {
@@ -90,6 +160,8 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
           _selectedProgram = _allProgramsLabel;
         }
       });
+
+      await _refreshClearanceAndAdminStampState();
     } catch (_) {
       if (!mounted) {
         return;
@@ -180,11 +252,45 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
     );
   }
 
-  Future<void> _activateSelectedStudents() async {
+  Future<void> _stampSelectedStudents() async {
+    if (_selectedStudentIds.isEmpty || _isBulkActionRunning) {
+      return;
+    }
+
+    if (!_isAdminActivityCardStamped) {
+      _showErrorMessage(
+        'Stamp action is locked until admin activity card is stamped.',
+      );
+      return;
+    }
+
+    final termId = _activeAcademicTerm?.id ?? 0;
+    if (termId <= 0) {
+      _showErrorMessage('No active academic term selected.');
+      return;
+    }
+
+    final selectedIds = _normalizeStudentIds(_selectedStudentIds.toList());
+    final stampableStudentIds = selectedIds
+        .where((studentId) => _clearedStudentIds.contains(studentId))
+        .toList(growable: false);
+
+    if (stampableStudentIds.isEmpty) {
+      _showErrorMessage('Only cleared students can be stamped.');
+      return;
+    }
+
+    final skippedCount = selectedIds.length - stampableStudentIds.length;
+    final successMessage = skippedCount > 0
+        ? 'Stamped ${stampableStudentIds.length} cleared student(s). '
+              '$skippedCount selected student(s) are not cleared.'
+        : 'Selected students were stamped.';
+
     await _runBulkAction(
-      action: _studentRepository.activateStudents,
-      successMessage: 'Selected students were activated.',
-      failureMessage: 'Unable to activate selected students.',
+      action: (studentIds) => _stampStudentsForTerm(studentIds, termId),
+      successMessage: successMessage,
+      failureMessage: 'Unable to stamp selected students.',
+      studentIdsOverride: stampableStudentIds,
     );
   }
 
@@ -296,12 +402,18 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
     required Future<void> Function(List<String> studentIds) action,
     required String successMessage,
     required String failureMessage,
+    List<String>? studentIdsOverride,
   }) async {
-    if (_selectedStudentIds.isEmpty || _isBulkActionRunning) {
+    if (_isBulkActionRunning) {
       return;
     }
 
-    final selectedStudentIds = _selectedStudentIds.toList();
+    final selectedStudentIds = _normalizeStudentIds(
+      studentIdsOverride ?? _selectedStudentIds.toList(),
+    );
+    if (selectedStudentIds.isEmpty) {
+      return;
+    }
 
     setState(() {
       _isBulkActionRunning = true;
@@ -320,6 +432,7 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
       });
 
       await _loadStudents();
+      await _refreshClearanceAndAdminStampState();
 
       if (!mounted) {
         return;
@@ -346,19 +459,1136 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
   }
 
   List<StudentEntity> get _filteredStudents {
-    return StudentDirectoryQuery.filterStudents(
+    final tabForStatusFilter = _selectedTab == _clearedTabLabel
+        ? 'All'
+        : _selectedTab;
+
+    final students = StudentDirectoryQuery.filterStudents(
       students: _allStudents,
       query: _searchController.text,
-      selectedStatus: _selectedTab,
+      selectedStatus: tabForStatusFilter,
       selectedProgram: _selectedProgram,
       allProgramsLabel: _allProgramsLabel,
     );
+
+    if (_selectedTab != _clearedTabLabel) {
+      return students;
+    }
+
+    return students
+        .where((student) => _clearedStudentIds.contains(student.studentId))
+        .toList(growable: false);
+  }
+
+  Future<void> _stampStudentsForTerm(
+    List<String> studentIds,
+    int termId,
+  ) async {
+    if (termId <= 0) {
+      return;
+    }
+
+    final normalizedStudentIds = _normalizeStudentIds(studentIds);
+    if (normalizedStudentIds.isEmpty) {
+      return;
+    }
+
+    final rows = normalizedStudentIds
+        .map(
+          (studentId) => {
+            'student_id': studentId,
+            'term_id': termId,
+            'is_cleared': true,
+            'is_stamp': true,
+          },
+        )
+        .toList(growable: false);
+
+    await Supabase.instance.client
+        .from(_activityCardsTable)
+        .upsert(rows, onConflict: 'student_id,term_id');
+  }
+
+  List<String> _normalizeStudentIds(List<String> studentIds) {
+    return studentIds
+        .map((studentId) => studentId.trim())
+        .where((studentId) => studentId.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+  }
+
+  Future<void> _refreshClearanceAndAdminStampState() async {
+    final termId = _activeAcademicTerm?.id ?? 0;
+    if (termId <= 0) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isAdminActivityCardStamped = false;
+        _clearedStudentIds = <String>{};
+      });
+      return;
+    }
+
+    final candidateStudentIds = _allStudents
+        .map((student) => student.studentId.trim())
+        .where((studentId) => studentId.isNotEmpty)
+        .toSet();
+
+    var adminStamped = false;
+    var clearedStudentIds = <String>{};
+
+    try {
+      final adminId = await _resolveCurrentAdminIdOrZero();
+      if (adminId > 0) {
+        adminStamped = await _fetchAdminActivityCardStampState(
+          adminId: adminId,
+          termId: termId,
+        );
+      }
+    } catch (_) {
+      adminStamped = false;
+    }
+
+    try {
+      clearedStudentIds = await _fetchClearedStudentIdsForTerm(
+        termId: termId,
+        candidateStudentIds: candidateStudentIds,
+      );
+    } catch (_) {
+      clearedStudentIds = <String>{};
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isAdminActivityCardStamped = adminStamped;
+      _clearedStudentIds = clearedStudentIds;
+    });
+  }
+
+  Future<bool> _fetchAdminActivityCardStampState({
+    required int adminId,
+    required int termId,
+  }) async {
+    final response = await Supabase.instance.client
+        .from(_adminActivityCardsTable)
+        .select('is_stamp')
+        .eq('admin_id', adminId)
+        .eq('term_id', termId)
+        .maybeSingle();
+
+    if (response == null) {
+      return false;
+    }
+
+    final stampValue = response['is_stamp'];
+    if (stampValue is bool) {
+      return stampValue;
+    }
+
+    return stampValue?.toString().toLowerCase() == 'true';
+  }
+
+  Future<Set<String>> _fetchClearedStudentIdsForTerm({
+    required int termId,
+    required Set<String> candidateStudentIds,
+  }) async {
+    if (candidateStudentIds.isEmpty) {
+      return <String>{};
+    }
+
+    final client = Supabase.instance.client;
+
+    final eventRows = await client
+        .from(_eventsTable)
+        .select('id')
+        .eq('term_id', termId)
+        .eq('is_mandatory', true);
+
+    final paymentRows = await client
+        .from(_paymentRequirementsTable)
+        .select('id')
+        .eq('term_id', termId)
+        .eq('is_mandatory', true);
+
+    final mandatoryEventIds = List<Map<String, dynamic>>.from(
+      eventRows,
+    ).map((row) => _readInt(row['id'])).where((id) => id > 0).toSet();
+
+    final mandatoryPaymentIds = List<Map<String, dynamic>>.from(
+      paymentRows,
+    ).map((row) => _readInt(row['id'])).where((id) => id > 0).toSet();
+
+    if (mandatoryEventIds.isEmpty && mandatoryPaymentIds.isEmpty) {
+      return <String>{};
+    }
+
+    final normalizedStudentIds = candidateStudentIds.toList(growable: false);
+
+    final completedEventsByStudent = await _fetchCompletedEventsByStudent(
+      eventIds: mandatoryEventIds.toList(growable: false),
+      studentIds: normalizedStudentIds,
+    );
+    final clearedPaymentsByStudent = await _fetchClearedPaymentsByStudent(
+      requirementIds: mandatoryPaymentIds.toList(growable: false),
+      studentIds: normalizedStudentIds,
+    );
+
+    final clearedStudentIds = <String>{};
+    for (final studentId in normalizedStudentIds) {
+      final completedEventIds =
+          completedEventsByStudent[studentId] ?? const <int>{};
+      final clearedPaymentIds =
+          clearedPaymentsByStudent[studentId] ?? const <int>{};
+
+      final eventsCleared = mandatoryEventIds.every(completedEventIds.contains);
+      final paymentsCleared = mandatoryPaymentIds.every(
+        clearedPaymentIds.contains,
+      );
+
+      if (eventsCleared && paymentsCleared) {
+        clearedStudentIds.add(studentId);
+      }
+    }
+
+    return clearedStudentIds;
+  }
+
+  Future<Map<String, Set<int>>> _fetchCompletedEventsByStudent({
+    required List<int> eventIds,
+    required List<String> studentIds,
+  }) async {
+    if (eventIds.isEmpty || studentIds.isEmpty) {
+      return const <String, Set<int>>{};
+    }
+
+    final response = await Supabase.instance.client
+        .from(_eventAttendanceTable)
+        .select(
+          'student_id, event_id, scanned_time_in, scanned_time_out, status',
+        )
+        .inFilter('event_id', eventIds)
+        .inFilter('student_id', studentIds);
+
+    final rows = List<Map<String, dynamic>>.from(response);
+    final completedEventsByStudent = <String, Set<int>>{};
+
+    for (final row in rows) {
+      final studentId = row['student_id']?.toString().trim() ?? '';
+      final eventId = _readInt(row['event_id']);
+      if (studentId.isEmpty || eventId <= 0) {
+        continue;
+      }
+
+      final status = row['status']?.toString().trim().toLowerCase() ?? '';
+      final hasTimeIn =
+          (row['scanned_time_in']?.toString().trim().isNotEmpty ?? false);
+      final hasTimeOut =
+          (row['scanned_time_out']?.toString().trim().isNotEmpty ?? false);
+      final isCompleted = status == 'completed' || (hasTimeIn && hasTimeOut);
+
+      if (!isCompleted) {
+        continue;
+      }
+
+      completedEventsByStudent
+          .putIfAbsent(studentId, () => <int>{})
+          .add(eventId);
+    }
+
+    return completedEventsByStudent;
+  }
+
+  Future<Map<String, Set<int>>> _fetchClearedPaymentsByStudent({
+    required List<int> requirementIds,
+    required List<String> studentIds,
+  }) async {
+    if (requirementIds.isEmpty || studentIds.isEmpty) {
+      return const <String, Set<int>>{};
+    }
+
+    final response = await Supabase.instance.client
+        .from(_transactionsTable)
+        .select('student_id, requirement_id, status')
+        .inFilter('requirement_id', requirementIds)
+        .inFilter('student_id', studentIds);
+
+    final rows = List<Map<String, dynamic>>.from(response);
+    final clearedPaymentsByStudent = <String, Set<int>>{};
+
+    for (final row in rows) {
+      final studentId = row['student_id']?.toString().trim() ?? '';
+      final requirementId = _readInt(row['requirement_id']);
+      if (studentId.isEmpty || requirementId <= 0) {
+        continue;
+      }
+
+      final status = row['status']?.toString().trim().toLowerCase() ?? '';
+      final isRejected = status == 'rejected' || status == 'declined';
+      if (isRejected) {
+        continue;
+      }
+
+      clearedPaymentsByStudent
+          .putIfAbsent(studentId, () => <int>{})
+          .add(requirementId);
+    }
+
+    return clearedPaymentsByStudent;
+  }
+
+  Future<int> _resolveCurrentAdminIdOrZero() async {
+    final user = SupabaseAuthService.currentUser;
+    final metadata = user?.userMetadata ?? const <String, dynamic>{};
+    final metadataAdminId = _readInt(metadata['admin_id']);
+    if (metadataAdminId > 0) {
+      return metadataAdminId;
+    }
+
+    final email = user?.email?.trim().toLowerCase() ?? '';
+    if (email.isEmpty) {
+      return 0;
+    }
+
+    try {
+      final row = await Supabase.instance.client
+          .from(_adminsTable)
+          .select('id')
+          .ilike('email', email)
+          .maybeSingle();
+      return _readInt(row?['id']);
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  int _readInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
+    }
+
+    if (value is String) {
+      return int.tryParse(value.trim()) ?? 0;
+    }
+
+    return 0;
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshScreen() async {
+    await Future.wait<void>([_loadStudents(), _loadAcademicTerms()]);
+  }
+
+  Future<void> _openAcademicTermActions() async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final activeLabel = _activeAcademicTerm?.label ?? 'No active term set';
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Academic Term',
+                  style: TextStyle(
+                    color: Color(0xFF003DA5),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Active: $activeLabel',
+                  style: const TextStyle(
+                    color: Colors.black54,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _buildAcademicActionTile(
+                  icon: Ionicons.add_circle_outline,
+                  title: 'Add New Term',
+                  subtitle: 'Create a new academic year and semester',
+                  onTap: () => Navigator.of(sheetContext).pop('add'),
+                ),
+                const SizedBox(height: 10),
+                _buildAcademicActionTile(
+                  icon: Ionicons.checkmark_circle_outline,
+                  title: 'Set Active Term',
+                  subtitle: _academicTerms.isEmpty
+                      ? 'Add a term first'
+                      : 'Switch the current active term',
+                  enabled: _academicTerms.isNotEmpty,
+                  onTap: _academicTerms.isEmpty
+                      ? null
+                      : () => Navigator.of(sheetContext).pop('set-active'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || action == null) {
+      return;
+    }
+
+    bool changed = false;
+    if (action == 'add') {
+      changed = await _showAddAcademicTermDialog();
+      if (changed && mounted) {
+        _showInfoMessage('Academic term saved.');
+      }
+    }
+
+    if (action == 'set-active') {
+      changed = await _showSetActiveAcademicTermDialog();
+      if (changed && mounted) {
+        _showInfoMessage('Active academic term updated.');
+      }
+    }
+
+    if (changed) {
+      _loadAcademicTerms();
+    }
+  }
+
+  Future<bool> _showAddAcademicTermDialog() async {
+    final yearController = TextEditingController(
+      text: _suggestedAcademicYear(),
+    );
+    String selectedSemester = _suggestedSemester();
+    bool setAsActive = true;
+    bool isSaving = false;
+    String? yearErrorText;
+
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (_, setSheetState) {
+            final bottomInset = MediaQuery.of(sheetContext).viewInsets.bottom;
+
+            return SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(20, 14, 20, 20 + bottomInset),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.black12,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Add Academic Term',
+                        style: TextStyle(
+                          color: Color(0xFF003DA5),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Create a term and optionally set it as active.',
+                        style: TextStyle(
+                          color: Colors.black.withOpacity(0.55),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: yearController,
+                        keyboardType: TextInputType.number,
+                        textInputAction: TextInputAction.done,
+                        onChanged: (_) {
+                          if (yearErrorText == null) {
+                            return;
+                          }
+                          setSheetState(() {
+                            yearErrorText = null;
+                          });
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'Academic Year',
+                          hintText: '2026-2027',
+                          errorText: yearErrorText,
+                          filled: true,
+                          fillColor: const Color(0xFF003DA5).withOpacity(0.03),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: const Color(0xFF003DA5).withOpacity(0.16),
+                            ),
+                          ),
+                          focusedBorder: const OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(12)),
+                            borderSide: BorderSide(color: Color(0xFF003DA5)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Semester',
+                        style: TextStyle(
+                          color: Color(0xFF003DA5),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _semesterOptions
+                            .map(
+                              (semester) => _buildSemesterChoiceChip(
+                                label: semester,
+                                isSelected: selectedSemester == semester,
+                                onTap: isSaving
+                                    ? null
+                                    : () {
+                                        setSheetState(() {
+                                          selectedSemester = semester;
+                                        });
+                                      },
+                              ),
+                            )
+                            .toList(),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF003DA5).withOpacity(0.03),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFF003DA5).withOpacity(0.12),
+                          ),
+                        ),
+                        child: SwitchListTile(
+                          value: setAsActive,
+                          activeColor: const Color(0xFF003DA5),
+                          title: const Text(
+                            'Set as active term',
+                            style: TextStyle(
+                              color: Color(0xFF003DA5),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          subtitle: const Text(
+                            'This term will be used as the current default',
+                            style: TextStyle(fontSize: 11),
+                          ),
+                          onChanged: isSaving
+                              ? null
+                              : (value) {
+                                  setSheetState(() {
+                                    setAsActive = value;
+                                  });
+                                },
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: isSaving
+                                  ? null
+                                  : () => Navigator.of(sheetContext).pop(false),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF003DA5),
+                                side: BorderSide(
+                                  color: const Color(
+                                    0xFF003DA5,
+                                  ).withOpacity(0.18),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: isSaving
+                                  ? null
+                                  : () async {
+                                      final academicYear = yearController.text
+                                          .trim();
+                                      if (!_isValidAcademicYear(academicYear)) {
+                                        setSheetState(() {
+                                          yearErrorText =
+                                              'Use YYYY-YYYY format (ex: 2026-2027).';
+                                        });
+                                        return;
+                                      }
+
+                                      setSheetState(() {
+                                        isSaving = true;
+                                        yearErrorText = null;
+                                      });
+
+                                      try {
+                                        await AcademicTermService.createTerm(
+                                          academicYear: academicYear,
+                                          semester: selectedSemester,
+                                          setActive: setAsActive,
+                                        );
+
+                                        if (sheetContext.mounted) {
+                                          Navigator.of(sheetContext).pop(true);
+                                        }
+                                      } catch (error) {
+                                        setSheetState(() {
+                                          isSaving = false;
+                                        });
+                                        _showErrorMessage(
+                                          _academicTermErrorMessage(error),
+                                        );
+                                      }
+                                    },
+                              style: ElevatedButton.styleFrom(
+                                elevation: 0,
+                                backgroundColor: const Color(0xFF003DA5),
+                                foregroundColor: Colors.white,
+                                disabledBackgroundColor: const Color(
+                                  0xFF003DA5,
+                                ).withOpacity(0.35),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: Text(
+                                isSaving ? 'Saving...' : 'Save Term',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    yearController.dispose();
+    return result == true;
+  }
+
+  Future<bool> _showSetActiveAcademicTermDialog() async {
+    if (_academicTerms.isEmpty) {
+      _showErrorMessage('No academic terms available yet.');
+      return false;
+    }
+
+    int selectedTermId = (_activeAcademicTerm ?? _academicTerms.first).id;
+    bool isSaving = false;
+
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (_, setSheetState) {
+            final bottomInset = MediaQuery.of(sheetContext).viewInsets.bottom;
+            final isSameAsActive = _activeAcademicTerm?.id == selectedTermId;
+
+            return SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(20, 14, 20, 20 + bottomInset),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.black12,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Set Active Term',
+                      style: TextStyle(
+                        color: Color(0xFF003DA5),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Select which term should be active for admin operations.',
+                      style: TextStyle(
+                        color: Colors.black.withOpacity(0.55),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight:
+                            MediaQuery.of(sheetContext).size.height * 0.46,
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: _academicTerms.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (_, index) {
+                          final term = _academicTerms[index];
+                          final isSelected = selectedTermId == term.id;
+
+                          return Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: isSaving
+                                  ? null
+                                  : () {
+                                      setSheetState(() {
+                                        selectedTermId = term.id;
+                                      });
+                                    },
+                              child: Ink(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? const Color(
+                                          0xFF003DA5,
+                                        ).withOpacity(0.08)
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? const Color(0xFF003DA5)
+                                        : const Color(
+                                            0xFF003DA5,
+                                          ).withOpacity(0.14),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            term.semester,
+                                            style: TextStyle(
+                                              color: isSelected
+                                                  ? const Color(0xFF003DA5)
+                                                  : Colors.black87,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'A.Y. ${term.academicYear}',
+                                            style: const TextStyle(
+                                              color: Colors.black54,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (term.isActive)
+                                      Container(
+                                        margin: const EdgeInsets.only(right: 8),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(
+                                            0xFF003DA5,
+                                          ).withOpacity(0.12),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'ACTIVE',
+                                          style: TextStyle(
+                                            color: Color(0xFF003DA5),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    Icon(
+                                      isSelected
+                                          ? Ionicons.radio_button_on
+                                          : Ionicons.radio_button_off,
+                                      color: isSelected
+                                          ? const Color(0xFF003DA5)
+                                          : Colors.black38,
+                                      size: 18,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: isSaving
+                                ? null
+                                : () => Navigator.of(sheetContext).pop(false),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF003DA5),
+                              side: BorderSide(
+                                color: const Color(
+                                  0xFF003DA5,
+                                ).withOpacity(0.18),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isSaving || isSameAsActive
+                                ? null
+                                : () async {
+                                    setSheetState(() {
+                                      isSaving = true;
+                                    });
+
+                                    try {
+                                      await AcademicTermService.setActiveTerm(
+                                        termId: selectedTermId,
+                                      );
+
+                                      if (sheetContext.mounted) {
+                                        Navigator.of(sheetContext).pop(true);
+                                      }
+                                    } catch (error) {
+                                      setSheetState(() {
+                                        isSaving = false;
+                                      });
+                                      _showErrorMessage(
+                                        _academicTermErrorMessage(error),
+                                      );
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              elevation: 0,
+                              backgroundColor: const Color(0xFF003DA5),
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: const Color(
+                                0xFF003DA5,
+                              ).withOpacity(0.35),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: Text(
+                              isSaving
+                                  ? 'Saving...'
+                                  : isSameAsActive
+                                  ? 'Already Active'
+                                  : 'Set Active',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    return result == true;
+  }
+
+  bool _isValidAcademicYear(String value) {
+    if (!RegExp(r'^\d{4}-\d{4}$').hasMatch(value)) {
+      return false;
+    }
+
+    final parts = value.split('-');
+    if (parts.length != 2) {
+      return false;
+    }
+
+    final startYear = int.tryParse(parts[0]);
+    final endYear = int.tryParse(parts[1]);
+    if (startYear == null || endYear == null) {
+      return false;
+    }
+
+    return endYear == startYear + 1;
+  }
+
+  String _suggestedAcademicYear() {
+    final activeYear = _activeAcademicTerm?.academicYear ?? '';
+    if (_isValidAcademicYear(activeYear)) {
+      final years = activeYear.split('-');
+      final startYear = int.tryParse(years.first) ?? DateTime.now().year;
+      final endYear = int.tryParse(years.last) ?? (startYear + 1);
+      return '${startYear + 1}-${endYear + 1}';
+    }
+
+    final now = DateTime.now();
+    final startYear = now.month >= 6 ? now.year : now.year - 1;
+    return '$startYear-${startYear + 1}';
+  }
+
+  String _suggestedSemester() {
+    final currentSemester = _activeAcademicTerm?.semester.trim();
+    if (currentSemester == '1st Semester') {
+      return '2nd Semester';
+    }
+    if (currentSemester == '2nd Semester') {
+      return 'Summer';
+    }
+    return _semesterOptions.first;
+  }
+
+  Widget _buildSemesterChoiceChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback? onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF003DA5) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isSelected
+                  ? const Color(0xFF003DA5)
+                  : const Color(0xFF003DA5).withOpacity(0.18),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : const Color(0xFF003DA5),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAcademicActionTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback? onTap,
+    bool enabled = true,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: enabled
+                ? const Color(0xFF003DA5).withOpacity(0.03)
+                : Colors.black.withOpacity(0.02),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: enabled
+                  ? const Color(0xFF003DA5).withOpacity(0.12)
+                  : Colors.black.withOpacity(0.08),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: enabled
+                      ? const Color(0xFF003DA5).withOpacity(0.1)
+                      : Colors.black.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  icon,
+                  size: 18,
+                  color: enabled ? const Color(0xFF003DA5) : Colors.black38,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: enabled
+                            ? const Color(0xFF003DA5)
+                            : Colors.black38,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: enabled ? Colors.black54 : Colors.black38,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Ionicons.chevron_forward,
+                size: 16,
+                color: enabled ? const Color(0xFF003DA5) : Colors.black26,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _academicTermErrorMessage(dynamic error) {
+    if (error is PostgrestException) {
+      if (error.code == '23505') {
+        return 'This academic year and semester already exists.';
+      }
+      return error.message;
+    }
+
+    return 'Unable to save academic term. Please try again.';
+  }
+
+  void _showInfoMessage(String message) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _showErrorMessage(String message) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
   }
 
   Future<void> _showProgramPicker() async {
@@ -570,7 +1800,7 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
               ),
             ),
             RefreshIndicator(
-              onRefresh: _loadStudents,
+              onRefresh: _refreshScreen,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.only(bottom: 24),
@@ -578,6 +1808,81 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 16),
+                    _buildSectionHeader(
+                      title: 'Academic Term',
+                      subtitle: _isLoadingAcademicTerms
+                          ? 'Loading current academic term...'
+                          : _activeAcademicTerm == null
+                          ? 'Set your active academic term first'
+                          : 'Active term: ${_activeAcademicTerm!.label}',
+                    ),
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFF003DA5).withOpacity(0.12),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.03),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 34,
+                              height: 34,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF003DA5).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              alignment: Alignment.center,
+                              child: const Icon(
+                                Ionicons.calendar_outline,
+                                color: Color(0xFF003DA5),
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _isLoadingAcademicTerms
+                                    ? 'Loading...'
+                                    : (_activeAcademicTerm?.label ??
+                                          'No active term set'),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF003DA5),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            _buildHeaderActionButton(
+                              label: 'Manage',
+                              icon: Ionicons.settings_outline,
+                              onTap: _isLoadingAcademicTerms
+                                  ? null
+                                  : _openAcademicTermActions,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
                     _buildSectionHeader(
                       title: 'Search & Filter',
                       subtitle: 'Find students by name, ID, or program',
@@ -661,7 +1966,12 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                               padding: const EdgeInsets.only(right: 12),
                               child: _buildProgramDropdownChip(),
                             ),
-                            ...['All', 'Active', 'Frozen'].map((tab) {
+                            ...[
+                              'All',
+                              'Active',
+                              'Frozen',
+                              _clearedTabLabel,
+                            ].map((tab) {
                               final isSelected = _selectedTab == tab;
                               return Padding(
                                 padding: const EdgeInsets.only(right: 12),
@@ -767,6 +2077,9 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
     final allVisibleSelected = _allVisibleStudentsSelected(filteredStudents);
     final hasSelectedStudents = _selectedStudentIds.isNotEmpty;
     final isFrozenTab = _selectedTab == 'Frozen';
+    final isClearedTab = _selectedTab == _clearedTabLabel;
+    final usesStampAction = isFrozenTab || isClearedTab;
+    final isStampLocked = usesStampAction && !_isAdminActivityCardStamped;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -853,6 +2166,8 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                   Text(
                     _isBulkActionRunning
                         ? 'Applying changes to selected students...'
+                        : isStampLocked
+                        ? 'Stamp action is locked until admin activity card is stamped.'
                         : 'Choose students, then select an action.',
                     style: TextStyle(
                       color: Colors.black.withOpacity(0.6),
@@ -894,16 +2209,19 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                     children: [
                       Expanded(
                         child: _buildBulkChoiceButton(
-                          label: isFrozenTab
-                              ? 'Activate Selected'
+                          label: usesStampAction
+                              ? 'Stamp Selected'
                               : 'Freeze Selected',
-                          icon: isFrozenTab
-                              ? Ionicons.checkmark_circle_outline
+                          icon: usesStampAction
+                              ? Ionicons.ribbon_outline
                               : Ionicons.snow_outline,
                           onPressed:
-                              hasSelectedStudents && !_isBulkActionRunning
-                              ? (isFrozenTab
-                                    ? _activateSelectedStudents
+                              hasSelectedStudents &&
+                                  !_isBulkActionRunning &&
+                                  (!usesStampAction ||
+                                      _isAdminActivityCardStamped)
+                              ? (usesStampAction
+                                    ? _stampSelectedStudents
                                     : _freezeSelectedStudents)
                               : null,
                         ),

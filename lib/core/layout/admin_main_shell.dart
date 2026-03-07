@@ -40,7 +40,7 @@ class _AdminMainShellState extends State<AdminMainShell> {
           child: Column(
             children: [
               AppMainHeader(
-                avatarPath: 'assets/logos/facet_logo.jpg',
+                avatarPath: 'assets/images/my_profile.png',
                 onAvatarTap: () {
                   if (_currentIndex == 4) {
                     return;

@@ -35,6 +35,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     _loadTodayEvents();
   }
 
+  Future<void> _refreshHomeScreen() async {
+    if (mounted) {
+      setState(() {
+        _isLoadingTodayEvents = true;
+        _isLoadingStatistics = true;
+      });
+    }
+
+    await _loadTodayEvents();
+  }
+
   Future<void> _loadTodayEvents() async {
     List<Map<String, dynamic>> events = const [];
     int totalStudentsCount = 0;
@@ -248,168 +259,351 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       children: [
         if (widget.showChrome)
           AppMainHeader(
-            avatarPath: 'assets/logos/facet_logo.jpg',
+            avatarPath: 'assets/images/my_profile.png',
             onAvatarTap: () => _openAdminTab(4),
             onSearchTap: () => openGlobalHeaderSearch(context),
           ),
         Expanded(
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: const Color(0xFF003DA5).withOpacity(0.1),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
+          child: RefreshIndicator(
+            onRefresh: _refreshHomeScreen,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: const Color(0xFF003DA5).withOpacity(0.1),
                         ),
-                      ],
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          RichText(
+                            text: const TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: 'Hello, ',
+                                  style: TextStyle(
+                                    color: Color(0xFF003DA5),
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: 'Admin',
+                                  style: TextStyle(
+                                    color: Color(0xFFFFC107),
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Manage students, events, and collections efficiently',
+                            style: TextStyle(
+                              color: Colors.black54,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        RichText(
-                          text: const TextSpan(
-                            children: [
-                              TextSpan(
-                                text: 'Hello, ',
-                                style: TextStyle(
-                                  color: Color(0xFF003DA5),
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              TextSpan(
-                                text: 'Admin',
-                                style: TextStyle(
-                                  color: Color(0xFFFFC107),
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSectionHeader(
+                    title: "Today's Event",
+                    subtitle: 'Track active events and attendance windows',
+                  ),
+                  const SizedBox(height: 14),
+                  if (_isLoadingTodayEvents)
+                    const SizedBox(
+                      height: 286,
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (_todayEvents.isEmpty)
+                    const SizedBox(
+                      height: 286,
+                      child: Center(
+                        child: Text(
+                          'No events today',
+                          style: TextStyle(
+                            color: Colors.black54,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Manage students, events, and collections efficiently',
-                          style: TextStyle(color: Colors.black54, fontSize: 14),
+                      ),
+                    )
+                  else
+                    SizedBox(
+                      height: 286,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: _todayEvents.length,
+                        itemBuilder: (context, index) {
+                          final event = _todayEvents[index];
+                          return InkWell(
+                            borderRadius: BorderRadius.circular(14),
+                            onTap: () async {
+                              final changed = await Navigator.push<bool>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AdminEventDetailsScreen(
+                                    eventId: _readInt(event['id']),
+                                    eventImage:
+                                        event['image'] as String? ??
+                                        'assets/images/event-siglakas.jpg',
+                                    eventName:
+                                        event['name'] as String? ?? 'Event',
+                                    eventDate:
+                                        event['date'] as String? ??
+                                        'Date not available',
+                                    eventTime:
+                                        EventDateTimeFormatters.buildEventTimeText(
+                                          timeIn: event['timeIn'] as String?,
+                                          timeOut: event['timeOut'] as String?,
+                                        ),
+                                    location:
+                                        event['location'] as String? ??
+                                        'University Campus',
+                                    locationSubtitle:
+                                        event['locationSubtitle'] as String? ??
+                                        '',
+                                    eventDateRaw:
+                                        event['eventDateRaw'] as String? ?? '',
+                                    timeInStartRaw:
+                                        event['timeInStartRaw'] as String? ??
+                                        '',
+                                    timeInEndRaw:
+                                        event['timeInEndRaw'] as String? ?? '',
+                                    timeOutStartRaw:
+                                        event['timeOutStartRaw'] as String? ??
+                                        '',
+                                    timeOutEndRaw:
+                                        event['timeOutEndRaw'] as String? ?? '',
+                                    shortDescription:
+                                        event['shortDescription'] as String? ??
+                                        'No short description available for this event.',
+                                    description:
+                                        event['description'] as String? ??
+                                        'No description available for this event.',
+                                    isObligatory:
+                                        event['isObligatory'] as bool? ?? false,
+                                    isTodayEvent: true,
+                                  ),
+                                ),
+                              );
+
+                              if (changed == true && mounted) {
+                                _loadTodayEvents();
+                              }
+                            },
+                            child: Container(
+                              width: 236,
+                              margin: const EdgeInsets.only(right: 14),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: const Color(
+                                    0xFF003DA5,
+                                  ).withOpacity(0.1),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: const BorderRadius.vertical(
+                                      top: Radius.circular(14),
+                                    ),
+                                    child: _buildEventImage(
+                                      event['image'] as String? ??
+                                          'assets/images/event-siglakas.jpg',
+                                      width: 236,
+                                      height: 132,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        12,
+                                        8,
+                                        12,
+                                        8,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  event['name'] as String? ??
+                                                      'Event',
+                                                  style: const TextStyle(
+                                                    color: Color(0xFF003DA5),
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 7,
+                                                      vertical: 3,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(
+                                                    0xFFFFC107,
+                                                  ).withOpacity(0.22),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: const Text(
+                                                  'TODAY',
+                                                  style: TextStyle(
+                                                    color: Color(0xFF003DA5),
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.w700,
+                                                    letterSpacing: 0.3,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            event['shortDescription']
+                                                    as String? ??
+                                                'No short description available for this event.',
+                                            style: const TextStyle(
+                                              color: Colors.black54,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 8),
+                                          _buildTodayEventInfoRow(
+                                            icon: Ionicons.calendar_outline,
+                                            text:
+                                                event['date'] as String? ?? '-',
+                                          ),
+                                          const SizedBox(height: 6),
+                                          _buildTodayEventInfoRow(
+                                            icon: Ionicons.log_in_outline,
+                                            text:
+                                                event['timeIn'] as String? ??
+                                                '-',
+                                          ),
+                                          const SizedBox(height: 6),
+                                          _buildTodayEventInfoRow(
+                                            icon: Ionicons.log_out_outline,
+                                            text:
+                                                event['timeOut'] as String? ??
+                                                '-',
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  const SizedBox(height: 20),
+                  _buildSectionHeader(
+                    title: 'Quick Actions',
+                    subtitle: 'Open your most-used admin tasks',
+                  ),
+                  const SizedBox(height: 14),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildActionCard(
+                            icon: Ionicons.person_add,
+                            label: 'Add Student',
+                            isHighlighted: true,
+                            onTap: () => _openAdminTab(1),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildActionCard(
+                            icon: Ionicons.calendar,
+                            label: 'Events',
+                            onTap: () => _openAdminTab(2),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildActionCard(
+                            icon: Ionicons.card,
+                            label: 'Payments',
+                            onTap: () => _openAdminTab(3),
+                          ),
                         ),
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                _buildSectionHeader(
-                  title: "Today's Event",
-                  subtitle: 'Track active events and attendance windows',
-                ),
-                const SizedBox(height: 14),
-                if (_isLoadingTodayEvents)
-                  const SizedBox(
-                    height: 286,
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (_todayEvents.isEmpty)
-                  const SizedBox(
-                    height: 286,
-                    child: Center(
-                      child: Text(
-                        'No events today',
-                        style: TextStyle(
-                          color: Colors.black54,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  SizedBox(
-                    height: 286,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      itemCount: _todayEvents.length,
-                      itemBuilder: (context, index) {
-                        final event = _todayEvents[index];
-                        return InkWell(
-                          borderRadius: BorderRadius.circular(14),
-                          onTap: () async {
-                            final changed = await Navigator.push<bool>(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => AdminEventDetailsScreen(
-                                  eventId: _readInt(event['id']),
-                                  eventImage:
-                                      event['image'] as String? ??
-                                      'assets/images/event-siglakas.jpg',
-                                  eventName:
-                                      event['name'] as String? ?? 'Event',
-                                  eventDate:
-                                      event['date'] as String? ??
-                                      'Date not available',
-                                  eventTime:
-                                      EventDateTimeFormatters.buildEventTimeText(
-                                        timeIn: event['timeIn'] as String?,
-                                        timeOut: event['timeOut'] as String?,
-                                      ),
-                                  location:
-                                      event['location'] as String? ??
-                                      'University Campus',
-                                  locationSubtitle:
-                                      event['locationSubtitle'] as String? ??
-                                      '',
-                                  eventDateRaw:
-                                      event['eventDateRaw'] as String? ?? '',
-                                  timeInStartRaw:
-                                      event['timeInStartRaw'] as String? ?? '',
-                                  timeInEndRaw:
-                                      event['timeInEndRaw'] as String? ?? '',
-                                  timeOutStartRaw:
-                                      event['timeOutStartRaw'] as String? ?? '',
-                                  timeOutEndRaw:
-                                      event['timeOutEndRaw'] as String? ?? '',
-                                  shortDescription:
-                                      event['shortDescription'] as String? ??
-                                      'No short description available for this event.',
-                                  description:
-                                      event['description'] as String? ??
-                                      'No description available for this event.',
-                                  isObligatory:
-                                      event['isObligatory'] as bool? ?? false,
-                                  isTodayEvent: true,
-                                ),
-                              ),
-                            );
-
-                            if (changed == true && mounted) {
-                              _loadTodayEvents();
-                            }
-                          },
+                  const SizedBox(height: 24),
+                  _buildSectionHeader(
+                    title: 'Statistics',
+                    subtitle: 'Current totals for this term',
+                  ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        Expanded(
                           child: Container(
-                            width: 236,
-                            margin: const EdgeInsets.only(right: 14),
+                            padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: const Color(0xFF003DA5).withOpacity(0.1),
-                              ),
+                              color: const Color(0xFF003DA5),
+                              borderRadius: BorderRadius.circular(12),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 10,
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 8,
                                   offset: const Offset(0, 4),
                                 ),
                               ],
@@ -417,245 +611,76 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                ClipRRect(
-                                  borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(14),
-                                  ),
-                                  child: _buildEventImage(
-                                    event['image'] as String? ??
-                                        'assets/images/event-siglakas.jpg',
-                                    width: 236,
-                                    height: 132,
+                                Text(
+                                  'Total Students',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      12,
-                                      8,
-                                      12,
-                                      8,
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                event['name'] as String? ??
-                                                    'Event',
-                                                style: const TextStyle(
-                                                  color: Color(0xFF003DA5),
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 7,
-                                                    vertical: 3,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: const Color(
-                                                  0xFFFFC107,
-                                                ).withOpacity(0.22),
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                              child: const Text(
-                                                'TODAY',
-                                                style: TextStyle(
-                                                  color: Color(0xFF003DA5),
-                                                  fontSize: 9,
-                                                  fontWeight: FontWeight.w700,
-                                                  letterSpacing: 0.3,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          event['shortDescription']
-                                                  as String? ??
-                                              'No short description available for this event.',
-                                          style: const TextStyle(
-                                            color: Colors.black54,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        _buildTodayEventInfoRow(
-                                          icon: Ionicons.calendar_outline,
-                                          text: event['date'] as String? ?? '-',
-                                        ),
-                                        const SizedBox(height: 6),
-                                        _buildTodayEventInfoRow(
-                                          icon: Ionicons.log_in_outline,
-                                          text:
-                                              event['timeIn'] as String? ?? '-',
-                                        ),
-                                        const SizedBox(height: 6),
-                                        _buildTodayEventInfoRow(
-                                          icon: Ionicons.log_out_outline,
-                                          text:
-                                              event['timeOut'] as String? ??
-                                              '-',
-                                        ),
-                                      ],
-                                    ),
+                                SizedBox(height: 12),
+                                Text(
+                                  _isLoadingStatistics
+                                      ? '...'
+                                      : _formatCount(_totalStudentsCount),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        );
-                      },
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFC107),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Upcoming Events',
+                                  style: TextStyle(
+                                    color: Colors.black87,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                SizedBox(height: 12),
+                                Text(
+                                  _isLoadingStatistics
+                                      ? '...'
+                                      : _formatCount(_upcomingEventsCount),
+                                  style: TextStyle(
+                                    color: Colors.black87,
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                const SizedBox(height: 20),
-                _buildSectionHeader(
-                  title: 'Quick Actions',
-                  subtitle: 'Open your most-used admin tasks',
-                ),
-                const SizedBox(height: 14),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _buildActionCard(
-                          icon: Ionicons.person_add,
-                          label: 'Add Student',
-                          isHighlighted: true,
-                          onTap: () => _openAdminTab(1),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildActionCard(
-                          icon: Ionicons.calendar,
-                          label: 'Events',
-                          onTap: () => _openAdminTab(2),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildActionCard(
-                          icon: Ionicons.card,
-                          label: 'Payments',
-                          onTap: () => _openAdminTab(3),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                _buildSectionHeader(
-                  title: 'Statistics',
-                  subtitle: 'Current totals for this term',
-                ),
-                const SizedBox(height: 12),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF003DA5),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Total Students',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              SizedBox(height: 12),
-                              Text(
-                                _isLoadingStatistics
-                                    ? '...'
-                                    : _formatCount(_totalStudentsCount),
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFC107),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Upcoming Events',
-                                style: TextStyle(
-                                  color: Colors.black87,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              SizedBox(height: 12),
-                              Text(
-                                _isLoadingStatistics
-                                    ? '...'
-                                    : _formatCount(_upcomingEventsCount),
-                                style: TextStyle(
-                                  color: Colors.black87,
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
           ),
         ),

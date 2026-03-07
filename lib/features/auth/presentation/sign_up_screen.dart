@@ -63,6 +63,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
         ? const <String>[]
         : (FacultyCatalog.programsByFaculty[selectedFaculty] ??
               const <String>[]);
+    final showPasswordRequirement =
+        passwordController.text.isNotEmpty &&
+        !PasswordPolicy.isValid(passwordController.text);
 
     return Theme(
       data: Theme.of(context).copyWith(textTheme: textTheme),
@@ -208,6 +211,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 onToggle: () {
                                   setState(() => showPassword = !showPassword);
                                 },
+                                onChanged: (_) {
+                                  setState(() {});
+                                },
+                                errorText: showPasswordRequirement
+                                    ? PasswordPolicy.requirementMessage
+                                    : null,
                               ),
                               const SizedBox(height: 16),
                               _buildLabel('Confirm Password'),
@@ -484,10 +493,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
     required String hint,
     required bool isVisible,
     required VoidCallback onToggle,
+    ValueChanged<String>? onChanged,
+    String? errorText,
   }) {
     return TextField(
       controller: controller,
       obscureText: !isVisible,
+      onChanged: onChanged,
       decoration:
           _buildInputDecoration(
             hintText: hint,
@@ -500,6 +512,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 color: royalBlue,
                 size: 20,
               ),
+            ),
+            errorText: errorText,
+            errorMaxLines: 2,
+            errorStyle: GoogleFonts.poppins(
+              color: Colors.red.shade700,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
             ),
           ),
       style: GoogleFonts.poppins(
