@@ -12,6 +12,7 @@ import '../../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../../core/widgets/app_main_header.dart';
 import '../../../../core/config/app_router.dart';
 import '../../../auth/data/supabase_auth_service.dart';
+import '../../../student_management/data/academic_term_service.dart';
 import '../../data/profile_image_upload_service.dart';
 import '../../data/supabase_profile_repository_impl.dart';
 
@@ -49,6 +50,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _selectedIndex = 4;
   bool _isLoggingOut = false;
   bool _isUploadingAvatar = false;
+  bool _isLoadingAcademicTerm = true;
 
   late String _userName;
   late String _userEmail;
@@ -56,6 +58,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late String _faculty;
   late String _program;
   String _avatarUrl = '';
+  AcademicTermOption? _activeAcademicTerm;
 
   @override
   void initState() {
@@ -68,6 +71,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadProfile();
+      _loadAcademicTerm();
     });
   }
 
@@ -99,6 +103,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     AvatarSyncService.setAvatar(email: _userEmail, avatarUrl: _avatarUrl);
+  }
+
+  Future<void> _loadAcademicTerm() async {
+    List<AcademicTermOption> terms = const <AcademicTermOption>[];
+
+    try {
+      terms = await AcademicTermService.fetchTerms();
+    } catch (_) {
+      terms = const <AcademicTermOption>[];
+    }
+
+    AcademicTermOption? activeTerm;
+    for (final term in terms) {
+      if (term.isActive) {
+        activeTerm = term;
+        break;
+      }
+    }
+
+    activeTerm ??= terms.isNotEmpty ? terms.first : null;
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _activeAcademicTerm = activeTerm;
+      _isLoadingAcademicTerm = false;
+    });
+  }
+
+  String get _academicTermLabel {
+    if (_isLoadingAcademicTerm) {
+      return 'Loading...';
+    }
+
+    return _activeAcademicTerm?.label ?? 'No active term set';
   }
 
   Future<void> _showAvatarActions() async {
@@ -545,6 +586,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         icon: Ionicons.card_outline,
                         label: 'Student ID',
                         value: _studentId,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildInfoCard(
+                        icon: Ionicons.calendar_outline,
+                        label: 'Academic Term',
+                        value: _academicTermLabel,
                       ),
                       const SizedBox(height: 12),
                       _buildInfoCard(

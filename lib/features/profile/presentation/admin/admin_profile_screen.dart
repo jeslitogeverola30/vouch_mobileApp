@@ -8,8 +8,10 @@ import 'package:ionicons/ionicons.dart';
 import '../../../../core/config/app_router.dart';
 import '../../../../core/services/avatar_sync_service.dart';
 import '../../../auth/data/supabase_auth_service.dart';
+import '../../../student_management/data/academic_term_service.dart';
 import '../../data/profile_image_upload_service.dart';
 import '../../data/supabase_admin_profile_repository_impl.dart';
+import 'admin_activity_card_screen.dart';
 
 class AdminProfileScreen extends StatefulWidget {
   final String adminName;
@@ -36,7 +38,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
 
   bool _isLoggingOut = false;
   bool _isUploadingAvatar = false;
+  bool _isLoadingAcademicTerm = true;
   String _avatarUrl = '';
+  AcademicTermOption? _activeAcademicTerm;
 
   @override
   void initState() {
@@ -44,6 +48,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     _avatarUrl = widget.avatarUrl;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadAdminAvatar();
+      _loadAcademicTerm();
     });
   }
 
@@ -65,6 +70,43 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     } catch (_) {
       return;
     }
+  }
+
+  Future<void> _loadAcademicTerm() async {
+    List<AcademicTermOption> terms = const <AcademicTermOption>[];
+
+    try {
+      terms = await AcademicTermService.fetchTerms();
+    } catch (_) {
+      terms = const <AcademicTermOption>[];
+    }
+
+    AcademicTermOption? activeTerm;
+    for (final term in terms) {
+      if (term.isActive) {
+        activeTerm = term;
+        break;
+      }
+    }
+
+    activeTerm ??= terms.isNotEmpty ? terms.first : null;
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _activeAcademicTerm = activeTerm;
+      _isLoadingAcademicTerm = false;
+    });
+  }
+
+  String get _academicTermLabel {
+    if (_isLoadingAcademicTerm) {
+      return 'Loading...';
+    }
+
+    return _activeAcademicTerm?.label ?? 'No active term set';
   }
 
   Future<void> _showAvatarActions() async {
@@ -446,6 +488,12 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                     child: Column(
                       children: [
                         _buildInfoCard(
+                          icon: Ionicons.calendar_outline,
+                          label: 'Academic Term',
+                          value: _academicTermLabel,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildInfoCard(
                           icon: Ionicons.people,
                           label: 'Faculty',
                           value: widget.facultyName,
@@ -500,9 +548,10 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                           title: 'View Activity Card',
                           subtitle: 'Open your activity card details',
                           onTap: () {
-                            Navigator.pushNamed(
-                              context,
-                              AppRouter.activityCard,
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const ActivityCardScreen(),
+                              ),
                             );
                           },
                         ),

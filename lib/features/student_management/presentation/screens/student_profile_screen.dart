@@ -4,6 +4,7 @@ import 'package:ionicons/ionicons.dart';
 
 import '../../data/supabase_student_management_impl.dart';
 import '../../domain/student_management_repository.dart';
+import '../../../profile/presentation/admin/student_activity_card_screen.dart';
 
 class StudentProfileAdminScreen extends StatefulWidget {
   final String studentName;
@@ -348,7 +349,19 @@ class _StudentProfileAdminScreenState extends State<StudentProfileAdminScreen> {
                             icon: Ionicons.card_outline,
                             title: 'Activity Card',
                             subtitle: 'View student activity card details',
-                            onTap: () => _showActionToast('View Activity Card'),
+                            onTap: () async {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => StudentActivityCardScreen(
+                                    studentName: widget.studentName,
+                                    studentId: widget.studentId,
+                                    email: widget.email,
+                                    program: widget.program,
+                                    avatarUrl: widget.avatarPath,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                           const SizedBox(height: 22),
                           _buildSectionHeader(

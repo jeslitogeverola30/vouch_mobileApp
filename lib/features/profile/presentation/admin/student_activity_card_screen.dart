@@ -5,24 +5,37 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/data/local/database_helper.dart';
 import '../../../../core/services/avatar_sync_service.dart';
-import '../../../auth/data/supabase_auth_service.dart';
 import '../../../student_management/data/academic_term_service.dart';
-import '../../data/supabase_profile_repository_impl.dart';
 
 const Color royalBlue = Color(0xFF003DA5);
 const Color gold = Color(0xFFFFC107);
 
-class ActivityCardScreen extends StatefulWidget {
-  const ActivityCardScreen({super.key});
+class StudentActivityCardScreen extends StatefulWidget {
+  const StudentActivityCardScreen({
+    super.key,
+    required this.studentName,
+    required this.studentId,
+    required this.email,
+    required this.program,
+    this.avatarUrl = '',
+  });
+
+  final String studentName;
+  final String studentId;
+  final String email;
+  final String program;
+  final String avatarUrl;
 
   @override
-  State<ActivityCardScreen> createState() => _ActivityCardScreenState();
+  State<StudentActivityCardScreen> createState() =>
+      _StudentActivityCardScreenState();
 }
 
-class _ActivityCardScreenState extends State<ActivityCardScreen> {
+class _StudentActivityCardScreenState extends State<StudentActivityCardScreen> {
   String _studentName = '';
   String _studentProgram = '';
   String _studentId = '';
+  String _studentEmail = '';
   String _avatarUrl = '';
 
   static const int _maxItemsPerRow = 8;
@@ -41,14 +54,23 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
   List<(String, bool)> _rowOneActivities = const [];
   List<(String, bool)> _rowTwoActivities = const [];
   bool _isOfficiallyCleared = false;
+  bool _isApplyingClearance = false;
+  bool _isStampedByAdmin = false;
   AcademicTermOption? _activeAcademicTerm;
 
   @override
   void initState() {
     super.initState();
 
+    _studentName = _readLabel(widget.studentName);
+    _studentProgram = _readLabel(widget.program);
+    _studentId = _readLabel(widget.studentId);
+    _studentEmail = _readLabel(widget.email).toLowerCase();
+    _avatarUrl = _readLabel(widget.avatarUrl);
+
     final syncedAvatar = AvatarSyncService.notifier.value;
-    if (syncedAvatar.email == _normalizedCurrentEmail() &&
+    if (_avatarUrl.isEmpty &&
+        syncedAvatar.email == _normalizedTargetEmail() &&
         syncedAvatar.avatarUrl != null) {
       _avatarUrl = syncedAvatar.avatarUrl!;
     }
@@ -65,76 +87,80 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
   }
 
   Future<void> _loadStudentProfile() async {
-    final currentUser = SupabaseAuthService.currentUser;
-    final email = _readLabel(currentUser?.email);
-    final metadata = currentUser?.userMetadata ?? const <String, dynamic>{};
-
     final localStudentData = <String, dynamic>{};
     final remoteStudentData = <String, dynamic>{};
-    final profileStudentData = <String, dynamic>{};
     final student = <String, dynamic>{};
 
-    try {
-      final profile = await SupabaseProfileRepositoryImpl.instance
-          .getCurrentUserProfile();
-      if (profile != null) {
-        profileStudentData.addAll(profile.toMap());
-      }
-    } catch (_) {
-      // Ignore and continue with other fallbacks.
-    }
+    final targetStudentId = _readLabel(widget.studentId);
+    final targetEmail = _normalizedTargetEmail();
 
-    if (email.isNotEmpty) {
-      try {
-        final remoteStudentRow = await Supabase.instance.client
-            .from(_studentsTable)
-            .select('email, full_name, student_id, program, profile_photo_url')
-            .ilike('email', email)
-            .maybeSingle();
-        if (remoteStudentRow != null) {
-          remoteStudentData.addAll(Map<String, dynamic>.from(remoteStudentRow));
-        }
-      } catch (_) {
-        // Ignore and continue with local DB fallback.
-      }
-
+    if (targetEmail.isNotEmpty) {
       final localStudentRow = await DatabaseHelper.instance.getStudentByEmail(
-        email,
+        targetEmail,
       );
       if (localStudentRow != null) {
         localStudentData.addAll(localStudentRow);
       }
     }
 
+    if (targetStudentId.isNotEmpty) {
+      try {
+        final remoteStudentRow = await Supabase.instance.client
+            .from(_studentsTable)
+            .select('email, full_name, student_id, program, profile_photo_url')
+            .eq('student_id', targetStudentId)
+            .maybeSingle();
+        if (remoteStudentRow != null) {
+          remoteStudentData.addAll(Map<String, dynamic>.from(remoteStudentRow));
+        }
+      } catch (_) {
+        // Ignore and continue with other fallbacks.
+      }
+    }
+
+    if (remoteStudentData.isEmpty && targetEmail.isNotEmpty) {
+      try {
+        final remoteStudentRow = await Supabase.instance.client
+            .from(_studentsTable)
+            .select('email, full_name, student_id, program, profile_photo_url')
+            .ilike('email', targetEmail)
+            .maybeSingle();
+        if (remoteStudentRow != null) {
+          remoteStudentData.addAll(Map<String, dynamic>.from(remoteStudentRow));
+        }
+      } catch (_) {
+        // Ignore and continue with local fallback values.
+      }
+    }
+
     student
       ..addAll(localStudentData)
-      ..addAll(remoteStudentData)
-      ..addAll(profileStudentData);
+      ..addAll(remoteStudentData);
 
     final resolvedName = _firstNonEmpty([
       student['full_name'],
       student['fullName'],
-      metadata['full_name'],
-      _metadataCombinedName(metadata),
+      widget.studentName,
       'Student',
     ]);
     final resolvedProgram = _firstNonEmpty([
       student['program'],
-      metadata['program'],
+      widget.program,
       'N/A',
     ]);
     final resolvedStudentId = _firstNonEmpty([
       student['student_id'],
       student['studentId'],
-      metadata['student_id'],
+      widget.studentId,
       'N/A',
     ]);
     final resolvedAvatarUrl = _firstNonEmpty([
       student['profile_photo_url'],
       student['profilePhotoUrl'],
+      widget.avatarUrl,
       _avatarUrl,
     ]);
-    final resolvedEmail = _firstNonEmpty([student['email'], email]);
+    final resolvedEmail = _firstNonEmpty([student['email'], targetEmail]);
 
     if (!mounted) {
       return;
@@ -144,16 +170,17 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
       _studentName = resolvedName;
       _studentProgram = resolvedProgram;
       _studentId = resolvedStudentId;
+      _studentEmail = resolvedEmail.toLowerCase();
       _avatarUrl = resolvedAvatarUrl;
     });
 
     AvatarSyncService.setAvatar(email: resolvedEmail, avatarUrl: _avatarUrl);
   }
 
-  String? _normalizedCurrentEmail() {
-    final email = SupabaseAuthService.currentUser?.email?.trim();
-    if (email == null || email.isEmpty) {
-      return null;
+  String _normalizedTargetEmail() {
+    final email = _firstNonEmpty([_studentEmail, widget.email]).trim();
+    if (email.isEmpty) {
+      return '';
     }
 
     return email.toLowerCase();
@@ -213,6 +240,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
     final capped = activities.take(_maxItemsTotal).toList(growable: false);
     final isOfficiallyCleared =
         capped.isNotEmpty && capped.every((item) => item.$2);
+    final stampState = isOfficiallyCleared ? _isStampedByAdmin : false;
 
     setState(() {
       _rowOneActivities = capped.take(_maxItemsPerRow).toList(growable: false);
@@ -221,7 +249,629 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
           .take(_maxItemsPerRow)
           .toList(growable: false);
       _isOfficiallyCleared = isOfficiallyCleared;
+      _isStampedByAdmin = stampState;
     });
+  }
+
+  bool get _shouldShowOfficialStamp =>
+      _isOfficiallyCleared && _isStampedByAdmin;
+
+  void _onStampCardPressed() {
+    if (!_isOfficiallyCleared) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Student must clear all mandatory requirements before stamping.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (_isStampedByAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This activity card is already stamped.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isStampedByAdmin = true;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Activity card stamped successfully.')),
+    );
+  }
+
+  Future<void> _clearStudentRequirements() async {
+    if (_isApplyingClearance) {
+      return;
+    }
+
+    List<_ObligatoryActivity> unclearedRequirements = const [];
+
+    try {
+      unclearedRequirements = await _fetchUnclearedRequirements();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to load uncleared requirements.'),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    if (unclearedRequirements.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('All mandatory requirements are cleared.'),
+        ),
+      );
+      return;
+    }
+
+    final selectedRequirements = await _showClearConfirmationModal(
+      unclearedRequirements,
+    );
+
+    if (!mounted ||
+        selectedRequirements == null ||
+        selectedRequirements.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _isApplyingClearance = true;
+    });
+
+    try {
+      final studentId = await _resolveCurrentStudentIdOrEmpty();
+      if (studentId.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Unable to resolve student account.')),
+          );
+        }
+        return;
+      }
+
+      final eventIds = selectedRequirements
+          .where((item) => item.type == _eventRequirementType)
+          .map((item) => item.sourceId)
+          .where((sourceId) => sourceId > 0)
+          .toSet()
+          .toList(growable: false);
+      final paymentRequirementIds = selectedRequirements
+          .where((item) => item.type == _paymentRequirementType)
+          .map((item) => item.sourceId)
+          .where((sourceId) => sourceId > 0)
+          .toSet()
+          .toList(growable: false);
+
+      await _markEventsAsAttended(studentId, eventIds);
+      await _markPaymentsAsApproved(studentId, paymentRequirementIds);
+      await _loadObligatoryActivities();
+
+      if (!mounted) {
+        return;
+      }
+
+      final selectedCount = selectedRequirements.length;
+      final requirementLabel = selectedCount == 1
+          ? 'requirement'
+          : 'requirements';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Cleared $selectedCount mandatory $requirementLabel.'),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to clear all mandatory requirements.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isApplyingClearance = false;
+        });
+      }
+    }
+  }
+
+  Future<List<_ObligatoryActivity>> _fetchUnclearedRequirements() async {
+    final requirements = await _fetchObligatoryActivities();
+    if (requirements.isEmpty) {
+      return const [];
+    }
+
+    final activityItems = await _buildActivityItems(requirements);
+    final maximumIndex = requirements.length < activityItems.length
+        ? requirements.length
+        : activityItems.length;
+
+    final unclearedRequirements = <_ObligatoryActivity>[];
+    for (var index = 0; index < maximumIndex; index++) {
+      final isActive = activityItems[index].$2;
+      if (!isActive) {
+        unclearedRequirements.add(requirements[index]);
+      }
+    }
+
+    return unclearedRequirements;
+  }
+
+  Future<List<_ObligatoryActivity>?> _showClearConfirmationModal(
+    List<_ObligatoryActivity> unclearedRequirements,
+  ) {
+    final selectedKeys = unclearedRequirements.map(_requirementKey).toSet();
+
+    return showDialog<List<_ObligatoryActivity>>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final totalCount = unclearedRequirements.length;
+            final selectedCount = selectedKeys.length;
+            final allSelected = totalCount > 0 && selectedCount == totalCount;
+            final hasSelection = selectedCount > 0;
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 24,
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: royalBlue.withOpacity(0.12)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  color: royalBlue.withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                alignment: Alignment.center,
+                                child: const Icon(
+                                  Ionicons.shield_checkmark_outline,
+                                  color: royalBlue,
+                                  size: 18,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Clear Requirements',
+                                      style: TextStyle(
+                                        color: royalBlue,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      'Choose mandatory items to clear for this student.',
+                                      style: TextStyle(
+                                        color: Colors.black87,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: royalBlue.withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '$selectedCount / $totalCount selected',
+                                  style: const TextStyle(
+                                    color: royalBlue,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              const Spacer(),
+                              TextButton.icon(
+                                onPressed: () {
+                                  setModalState(() {
+                                    if (allSelected) {
+                                      selectedKeys.clear();
+                                    } else {
+                                      selectedKeys
+                                        ..clear()
+                                        ..addAll(
+                                          unclearedRequirements.map(
+                                            _requirementKey,
+                                          ),
+                                        );
+                                    }
+                                  });
+                                },
+                                style: TextButton.styleFrom(
+                                  foregroundColor: royalBlue,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 8,
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                icon: Icon(
+                                  allSelected
+                                      ? Ionicons.remove_circle_outline
+                                      : Ionicons.checkmark_done_outline,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  allSelected ? 'Unselect All' : 'Select All',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 280),
+                            child: ListView.separated(
+                              shrinkWrap: true,
+                              itemCount: unclearedRequirements.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 8),
+                              itemBuilder: (context, index) {
+                                final requirement =
+                                    unclearedRequirements[index];
+                                final key = _requirementKey(requirement);
+                                final isSelected = selectedKeys.contains(key);
+
+                                return Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(12),
+                                    onTap: () {
+                                      setModalState(() {
+                                        if (isSelected) {
+                                          selectedKeys.remove(key);
+                                        } else {
+                                          selectedKeys.add(key);
+                                        }
+                                      });
+                                    },
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 130,
+                                      ),
+                                      curve: Curves.easeOut,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 10,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? royalBlue.withOpacity(0.06)
+                                            : Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? royalBlue
+                                              : royalBlue.withOpacity(0.16),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Checkbox(
+                                            value: isSelected,
+                                            activeColor: royalBlue,
+                                            onChanged: (value) {
+                                              setModalState(() {
+                                                if (value == true) {
+                                                  selectedKeys.add(key);
+                                                } else {
+                                                  selectedKeys.remove(key);
+                                                }
+                                              });
+                                            },
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              requirement.label,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: Colors.black87,
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 5,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: _requirementTypeColor(
+                                                requirement,
+                                              ).withOpacity(0.12),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                            ),
+                                            child: Text(
+                                              _requirementTypeLabel(
+                                                requirement,
+                                              ),
+                                              style: TextStyle(
+                                                color: _requirementTypeColor(
+                                                  requirement,
+                                                ),
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () =>
+                                      Navigator.of(dialogContext).pop(),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: royalBlue,
+                                    side: BorderSide(
+                                      color: royalBlue.withOpacity(0.24),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 11,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Cancel',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: hasSelection
+                                      ? () {
+                                          final selectedRequirements =
+                                              unclearedRequirements
+                                                  .where(
+                                                    (requirement) =>
+                                                        selectedKeys.contains(
+                                                          _requirementKey(
+                                                            requirement,
+                                                          ),
+                                                        ),
+                                                  )
+                                                  .toList(growable: false);
+
+                                          Navigator.of(
+                                            dialogContext,
+                                          ).pop(selectedRequirements);
+                                        }
+                                      : null,
+                                  style: ElevatedButton.styleFrom(
+                                    elevation: 0,
+                                    backgroundColor: royalBlue,
+                                    foregroundColor: Colors.white,
+                                    disabledBackgroundColor: royalBlue
+                                        .withOpacity(0.35),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 11,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    hasSelection
+                                        ? 'Clear Selected ($selectedCount)'
+                                        : 'Clear Selected',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _requirementKey(_ObligatoryActivity requirement) {
+    return '${requirement.type}:${requirement.sourceId}';
+  }
+
+  String _requirementTypeLabel(_ObligatoryActivity requirement) {
+    return requirement.type == _eventRequirementType ? 'Event' : 'Payment';
+  }
+
+  Color _requirementTypeColor(_ObligatoryActivity requirement) {
+    return requirement.type == _eventRequirementType
+        ? royalBlue
+        : const Color(0xFF2E7D32);
+  }
+
+  Future<void> _markEventsAsAttended(
+    String studentId,
+    List<int> eventIds,
+  ) async {
+    if (eventIds.isEmpty) {
+      return;
+    }
+
+    final client = Supabase.instance.client;
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+
+    final existingRows = await client
+        .from(_eventAttendanceTable)
+        .select('event_id')
+        .eq('student_id', studentId)
+        .inFilter('event_id', eventIds);
+
+    final existingEventIds = List<Map<String, dynamic>>.from(existingRows)
+        .map((row) => _readInt(row['event_id']))
+        .where((eventId) => eventId > 0)
+        .toSet();
+
+    final missingEventIds = eventIds
+        .where((eventId) => !existingEventIds.contains(eventId))
+        .toList(growable: false);
+
+    for (final eventId in missingEventIds) {
+      try {
+        await client.from(_eventAttendanceTable).insert({
+          'event_id': eventId,
+          'student_id': studentId,
+          'scanned_time_in': nowIso,
+          'scanned_time_out': nowIso,
+          'status': 'completed',
+        });
+      } catch (_) {
+        // Ignore insert failures and continue with updates below.
+      }
+    }
+
+    await client
+        .from(_eventAttendanceTable)
+        .update({
+          'scanned_time_in': nowIso,
+          'scanned_time_out': nowIso,
+          'status': 'completed',
+        })
+        .eq('student_id', studentId)
+        .inFilter('event_id', eventIds);
+  }
+
+  Future<void> _markPaymentsAsApproved(
+    String studentId,
+    List<int> requirementIds,
+  ) async {
+    if (requirementIds.isEmpty) {
+      return;
+    }
+
+    final client = Supabase.instance.client;
+    final seed = DateTime.now().millisecondsSinceEpoch;
+
+    final existingRows = await client
+        .from(_transactionsTable)
+        .select('requirement_id')
+        .eq('student_id', studentId)
+        .inFilter('requirement_id', requirementIds);
+
+    final existingRequirementIds = List<Map<String, dynamic>>.from(existingRows)
+        .map((row) => _readInt(row['requirement_id']))
+        .where((requirementId) => requirementId > 0)
+        .toSet();
+
+    final missingRequirementIds = requirementIds
+        .where(
+          (requirementId) => !existingRequirementIds.contains(requirementId),
+        )
+        .toList(growable: false);
+
+    for (var index = 0; index < missingRequirementIds.length; index++) {
+      final requirementId = missingRequirementIds[index];
+      try {
+        await client.from(_transactionsTable).insert({
+          'student_id': studentId,
+          'requirement_id': requirementId,
+          'reference_number': 'ADMIN-CLEAR-$seed-$index',
+          'proof_photo_url': 'admin-clearance',
+          'status': 'approved',
+        });
+      } catch (_) {
+        // Ignore insert failures and continue with updates below.
+      }
+    }
+
+    await client
+        .from(_transactionsTable)
+        .update({'status': 'approved'})
+        .eq('student_id', studentId)
+        .inFilter('requirement_id', requirementIds);
   }
 
   Future<List<(String, bool)>> _buildActivityItems(
@@ -447,24 +1097,12 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
   }
 
   Future<String> _resolveCurrentStudentIdOrEmpty() async {
-    try {
-      final profile = await SupabaseProfileRepositoryImpl.instance
-          .getCurrentUserProfile();
-      final studentId = _readLabel(profile?.studentId);
-      if (studentId.isNotEmpty) {
-        return studentId;
-      }
-    } catch (_) {
-      // Ignore and continue with fallback resolvers.
+    final targetStudentId = _firstNonEmpty([_studentId, widget.studentId]);
+    if (targetStudentId.isNotEmpty) {
+      return targetStudentId;
     }
 
-    final user = SupabaseAuthService.currentUser;
-    final metadataStudentId = _readLabel(user?.userMetadata?['student_id']);
-    if (metadataStudentId.isNotEmpty) {
-      return metadataStudentId;
-    }
-
-    final email = _readLabel(user?.email);
+    final email = _normalizedTargetEmail();
     if (email.isEmpty) {
       return '';
     }
@@ -520,13 +1158,6 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
     return '';
   }
 
-  String _metadataCombinedName(Map<String, dynamic> metadata) {
-    final firstName = _readLabel(metadata['first_name']);
-    final lastName = _readLabel(metadata['last_name']);
-    final combined = '$firstName $lastName'.trim();
-    return combined;
-  }
-
   String _readLabel(dynamic value) {
     return value?.toString().trim() ?? '';
   }
@@ -565,6 +1196,18 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
       data: Theme.of(context).copyWith(textTheme: textTheme),
       child: Scaffold(
         backgroundColor: Colors.white,
+        floatingActionButton: FloatingActionButton(
+          onPressed: _isApplyingClearance ? null : _onStampCardPressed,
+          tooltip: _isStampedByAdmin
+              ? 'Card already stamped'
+              : 'Stamp activity card',
+          backgroundColor: _isStampedByAdmin ? royalBlue : gold,
+          foregroundColor: _isStampedByAdmin ? gold : royalBlue,
+          child: Icon(
+            _isStampedByAdmin ? Ionicons.ribbon : Ionicons.ribbon_outline,
+          ),
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         body: Stack(
           children: [
             Positioned(
@@ -641,6 +1284,27 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
                 icon: const Icon(Ionicons.arrow_back, color: royalBlue),
               ),
             ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                onPressed: _isApplyingClearance
+                    ? null
+                    : _clearStudentRequirements,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                tooltip: 'Clear student requirements',
+                icon: _isApplyingClearance
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(
+                        Ionicons.checkmark_done_circle_outline,
+                        color: royalBlue,
+                      ),
+              ),
+            ),
             RichText(
               text: TextSpan(
                 style: GoogleFonts.poppins(
@@ -697,7 +1361,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
               ),
             ),
             Positioned(top: 80, left: -48, child: _buildProfileSection()),
-            if (_isOfficiallyCleared)
+            if (_shouldShowOfficialStamp)
               Positioned(
                 left: -60,
                 bottom: 12,
@@ -706,7 +1370,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
                   child: _buildOfficiallyClearedTab(),
                 ),
               ),
-            if (_isOfficiallyCleared)
+            if (_shouldShowOfficialStamp)
               Positioned(
                 left: 83,
                 bottom: 37,
