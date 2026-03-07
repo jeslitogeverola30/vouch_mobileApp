@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_router.dart';
 import '../services/app_notification_service.dart';
+import '../services/local_notification_service.dart';
 import '../services/avatar_sync_service.dart';
 import '../../features/auth/data/supabase_auth_service.dart';
 
@@ -155,7 +156,25 @@ class _AppMainHeaderState extends State<AppMainHeader>
       );
 
     if (enabled) {
+      final permissionGranted = await LocalNotificationService.instance
+          .requestPermissionIfNeeded();
+
+      if (!permissionGranted && mounted) {
+        final fallbackMessenger = ScaffoldMessenger.of(context);
+        fallbackMessenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Allow Android notification permission to receive system alerts.',
+              ),
+            ),
+          );
+      }
+
       await _runNotificationUpdateCheck(force: true);
+    } else {
+      await LocalNotificationService.instance.cancelAll();
     }
   }
 
@@ -168,10 +187,59 @@ class _AppMainHeaderState extends State<AppMainHeader>
       return;
     }
 
+    final notificationItems = messages
+        .map(_mapMessageToNotificationItem)
+        .toList(growable: false);
+
+    var didShowSystemNotification = false;
+    for (final item in notificationItems) {
+      final didShow = await LocalNotificationService.instance
+          .showUpdateNotification(
+            title: item.title,
+            body: item.body,
+            target: item.target,
+          );
+      didShowSystemNotification = didShowSystemNotification || didShow;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    if (didShowSystemNotification) {
+      return;
+    }
+
     final messenger = ScaffoldMessenger.of(context);
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(messages.join('\n'))));
+  }
+
+  _SystemNotificationItem _mapMessageToNotificationItem(String message) {
+    final normalized = message.toLowerCase();
+
+    if (normalized.contains('fee')) {
+      return _SystemNotificationItem(
+        title: 'Fee Update',
+        body: message,
+        target: NotificationNavigationTarget.payments,
+      );
+    }
+
+    if (normalized.contains('today')) {
+      return _SystemNotificationItem(
+        title: 'Today\'s Events',
+        body: message,
+        target: NotificationNavigationTarget.todayEvents,
+      );
+    }
+
+    return _SystemNotificationItem(
+      title: 'Event Update',
+      body: message,
+      target: NotificationNavigationTarget.events,
+    );
   }
 
   void _onSyncedAvatarChanged() {
@@ -375,4 +443,16 @@ class _AppMainHeaderState extends State<AppMainHeader>
       ),
     );
   }
+}
+
+class _SystemNotificationItem {
+  const _SystemNotificationItem({
+    required this.title,
+    required this.body,
+    required this.target,
+  });
+
+  final String title;
+  final String body;
+  final NotificationNavigationTarget target;
 }
