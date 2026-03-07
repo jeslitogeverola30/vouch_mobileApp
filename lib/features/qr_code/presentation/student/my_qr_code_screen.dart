@@ -123,6 +123,16 @@ class _QRScreenState extends State<QRScreen> {
     }
   }
 
+  Future<void> _refreshQrScreen() async {
+    if (mounted) {
+      setState(() {
+        _isLoadingProfile = true;
+      });
+    }
+
+    await _loadProfileFromDatabase();
+  }
+
   String _generateQRData({
     required String studentId,
     required String fullName,
@@ -247,49 +257,53 @@ class _QRScreenState extends State<QRScreen> {
             onSearchTap: () => openGlobalHeaderSearch(context),
           ),
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                StudentQrContentCard(
-                  userAvatarPath: widget.userAvatarPath,
-                  avatarUrl: _avatarUrl,
-                  fullName: _fullName,
-                  studentId: _studentId,
-                  isLoadingProfile: _isLoadingProfile,
-                  qrData: qrData,
-                  program: _program,
-                  faculty: _faculty,
-                ),
-                const SizedBox(height: 18),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton.icon(
-                      onPressed: _downloadQRCode,
-                      icon: const Icon(Ionicons.download_outline, size: 20),
-                      label: Text(
-                        'Download QR Code',
-                        style: GoogleFonts.poppins(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
+          child: RefreshIndicator(
+            onRefresh: _refreshQrScreen,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(bottom: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  StudentQrContentCard(
+                    userAvatarPath: widget.userAvatarPath,
+                    avatarUrl: _avatarUrl,
+                    fullName: _fullName,
+                    studentId: _studentId,
+                    isLoadingProfile: _isLoadingProfile,
+                    qrData: qrData,
+                    program: _program,
+                    faculty: _faculty,
+                  ),
+                  const SizedBox(height: 18),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        onPressed: _downloadQRCode,
+                        icon: const Icon(Ionicons.download_outline, size: 20),
+                        label: Text(
+                          'Download QR Code',
+                          style: GoogleFonts.poppins(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: gold,
-                        foregroundColor: royalBlue,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: gold,
+                          foregroundColor: royalBlue,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

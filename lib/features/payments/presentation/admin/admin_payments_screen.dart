@@ -572,7 +572,6 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
     if (uri == null) {
       return false;
     }
-
     return uri.scheme == 'http' || uri.scheme == 'https';
   }
 
@@ -751,6 +750,10 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
     );
   }
 
+  Future<void> _refreshScreen() async {
+    await Future.wait<void>([_loadReceiverReference(), _loadSubmissions()]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme);
@@ -791,147 +794,151 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
                 ),
               ),
             ),
-            SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 16),
-                  _buildReceiverReferenceCard(),
-                  const SizedBox(height: 24),
-                  _buildSearchAndFilterHeader(),
-                  const SizedBox(height: 12),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Container(
-                      constraints: const BoxConstraints(minHeight: 58),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: const Color(0xFF003DA5).withOpacity(0.12),
+            RefreshIndicator(
+              onRefresh: _refreshScreen,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 16),
+                    _buildReceiverReferenceCard(),
+                    const SizedBox(height: 24),
+                    _buildSearchAndFilterHeader(),
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Container(
+                        constraints: const BoxConstraints(minHeight: 58),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFF003DA5).withOpacity(0.12),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.03),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.03),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          const SizedBox(width: 12),
-                          const Icon(
-                            Ionicons.search,
-                            color: Color(0xFF003DA5),
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextField(
-                              controller: _searchController,
-                              style: const TextStyle(
-                                color: Colors.black87,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              decoration: const InputDecoration(
-                                hintText:
-                                    'Search by student name, program, or fee',
-                                hintStyle: TextStyle(
-                                  color: Colors.grey,
+                        child: Row(
+                          children: [
+                            const SizedBox(width: 12),
+                            const Icon(
+                              Ionicons.search,
+                              color: Color(0xFF003DA5),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _searchController,
+                                style: const TextStyle(
+                                  color: Colors.black87,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
                                 ),
-                                border: InputBorder.none,
-                                isDense: true,
-                                contentPadding: EdgeInsets.symmetric(
-                                  vertical: 16,
+                                decoration: const InputDecoration(
+                                  hintText:
+                                      'Search by student name, program, or fee',
+                                  hintStyle: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 6),
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: _buildInlineFeeTypeFilter(),
-                          ),
-                        ],
+                            const SizedBox(width: 6),
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: _buildInlineFeeTypeFilter(),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: ['Pending', 'Approved', 'Rejected'].map((
-                          tab,
-                        ) {
-                          final isActive = _selectedFilter == tab;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 12),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(20),
-                                onTap: () =>
-                                    setState(() => _selectedFilter = tab),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 140),
-                                  curve: Curves.easeOut,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                    vertical: 10,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isActive
-                                        ? const Color(0xFF003DA5)
-                                        : Colors.white,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: ['Pending', 'Approved', 'Rejected'].map((
+                            tab,
+                          ) {
+                            final isActive = _selectedFilter == tab;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 12),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: () =>
+                                      setState(() => _selectedFilter = tab),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 140),
+                                    curve: Curves.easeOut,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
                                       color: isActive
                                           ? const Color(0xFF003DA5)
-                                          : const Color(
-                                              0xFF003DA5,
-                                            ).withOpacity(0.18),
+                                          : Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: isActive
+                                            ? const Color(0xFF003DA5)
+                                            : const Color(
+                                                0xFF003DA5,
+                                              ).withOpacity(0.18),
+                                      ),
                                     ),
-                                  ),
-                                  child: Text(
-                                    tab,
-                                    style: TextStyle(
-                                      color: isActive
-                                          ? Colors.white
-                                          : const Color(0xFF003DA5),
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
+                                    child: Text(
+                                      tab,
+                                      style: TextStyle(
+                                        color: isActive
+                                            ? Colors.white
+                                            : const Color(0xFF003DA5),
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                          );
-                        }).toList(),
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  _buildSectionHeader(
-                    title: 'Submissions',
-                    subtitle: submissionsSubtitle,
-                  ),
-                  const SizedBox(height: 12),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: _buildSubmissionListPanel(
-                      submissions: filteredSubmissions,
-                      isLoading: _isLoadingSubmissions,
-                      errorMessage: _submissionErrorMessage,
+                    const SizedBox(height: 24),
+                    _buildSectionHeader(
+                      title: 'Submissions',
+                      subtitle: submissionsSubtitle,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _buildSubmissionListPanel(
+                        submissions: filteredSubmissions,
+                        isLoading: _isLoadingSubmissions,
+                        errorMessage: _submissionErrorMessage,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             Positioned(

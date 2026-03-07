@@ -34,6 +34,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
   static const String _studentsTable = 'students';
   static const String _eventAttendanceTable = 'event_attendance';
   static const String _transactionsTable = 'student_transactions';
+  static const String _activityCardsTable = 'activity_cards';
 
   static const String _eventRequirementType = 'event';
   static const String _paymentRequirementType = 'payment';
@@ -41,6 +42,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
   List<(String, bool)> _rowOneActivities = const [];
   List<(String, bool)> _rowTwoActivities = const [];
   bool _isOfficiallyCleared = false;
+  bool _isStampedByAdmin = false;
   AcademicTermOption? _activeAcademicTerm;
 
   @override
@@ -213,6 +215,24 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
     final capped = activities.take(_maxItemsTotal).toList(growable: false);
     final isOfficiallyCleared =
         capped.isNotEmpty && capped.every((item) => item.$2);
+    var stampState = false;
+
+    if (isOfficiallyCleared) {
+      final termId = _activeAcademicTerm?.id ?? 0;
+      if (termId > 0) {
+        try {
+          final studentId = await _resolveCurrentStudentIdOrEmpty();
+          if (studentId.isNotEmpty) {
+            stampState = await _fetchActivityCardStampState(
+              studentId: studentId,
+              termId: termId,
+            );
+          }
+        } catch (_) {
+          stampState = false;
+        }
+      }
+    }
 
     setState(() {
       _rowOneActivities = capped.take(_maxItemsPerRow).toList(growable: false);
@@ -221,8 +241,12 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
           .take(_maxItemsPerRow)
           .toList(growable: false);
       _isOfficiallyCleared = isOfficiallyCleared;
+      _isStampedByAdmin = stampState;
     });
   }
+
+  bool get _shouldShowOfficialStamp =>
+      _isOfficiallyCleared && _isStampedByAdmin;
 
   Future<List<(String, bool)>> _buildActivityItems(
     List<_ObligatoryActivity> requirements,
@@ -444,6 +468,29 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
     }
 
     return activeRequirementIds;
+  }
+
+  Future<bool> _fetchActivityCardStampState({
+    required String studentId,
+    required int termId,
+  }) async {
+    final response = await Supabase.instance.client
+        .from(_activityCardsTable)
+        .select('is_stamp')
+        .eq('student_id', studentId)
+        .eq('term_id', termId)
+        .maybeSingle();
+
+    if (response == null) {
+      return false;
+    }
+
+    final stampValue = response['is_stamp'];
+    if (stampValue is bool) {
+      return stampValue;
+    }
+
+    return _readLabel(stampValue).toLowerCase() == 'true';
   }
 
   Future<String> _resolveCurrentStudentIdOrEmpty() async {
@@ -697,7 +744,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
               ),
             ),
             Positioned(top: 80, left: -48, child: _buildProfileSection()),
-            if (_isOfficiallyCleared)
+            if (_shouldShowOfficialStamp)
               Positioned(
                 left: -60,
                 bottom: 12,
@@ -706,7 +753,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
                   child: _buildOfficiallyClearedTab(),
                 ),
               ),
-            if (_isOfficiallyCleared)
+            if (_shouldShowOfficialStamp)
               Positioned(
                 left: 83,
                 bottom: 37,

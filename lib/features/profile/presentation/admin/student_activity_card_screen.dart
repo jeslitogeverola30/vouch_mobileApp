@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/data/local/database_helper.dart';
 import '../../../../core/services/avatar_sync_service.dart';
+import '../../../auth/data/supabase_auth_service.dart';
 import '../../../student_management/data/academic_term_service.dart';
 
 const Color royalBlue = Color(0xFF003DA5);
@@ -45,8 +46,11 @@ class _StudentActivityCardScreenState extends State<StudentActivityCardScreen> {
   static const String _eventsTable = 'events';
   static const String _paymentRequirementsTable = 'payment_requirements';
   static const String _studentsTable = 'students';
+  static const String _adminsTable = 'admins';
   static const String _eventAttendanceTable = 'event_attendance';
   static const String _transactionsTable = 'student_transactions';
+  static const String _activityCardsTable = 'activity_cards';
+  static const String _adminActivityCardsTable = 'admin_activity_cards';
 
   static const String _eventRequirementType = 'event';
   static const String _paymentRequirementType = 'payment';
@@ -55,6 +59,8 @@ class _StudentActivityCardScreenState extends State<StudentActivityCardScreen> {
   List<(String, bool)> _rowTwoActivities = const [];
   bool _isOfficiallyCleared = false;
   bool _isApplyingClearance = false;
+  bool _isStampingCard = false;
+  bool _isAdminActivityCardStamped = false;
   bool _isStampedByAdmin = false;
   AcademicTermOption? _activeAcademicTerm;
 
@@ -240,7 +246,39 @@ class _StudentActivityCardScreenState extends State<StudentActivityCardScreen> {
     final capped = activities.take(_maxItemsTotal).toList(growable: false);
     final isOfficiallyCleared =
         capped.isNotEmpty && capped.every((item) => item.$2);
-    final stampState = isOfficiallyCleared ? _isStampedByAdmin : false;
+    final activeTermId = _activeAcademicTerm?.id ?? 0;
+    var adminStampState = false;
+    var studentStampState = false;
+
+    if (activeTermId > 0) {
+      try {
+        final adminId = await _resolveCurrentAdminIdOrZero();
+        if (adminId > 0) {
+          adminStampState = await _fetchAdminActivityCardStampState(
+            adminId: adminId,
+            termId: activeTermId,
+          );
+        }
+      } catch (_) {
+        adminStampState = false;
+      }
+    }
+
+    if (isOfficiallyCleared) {
+      if (activeTermId > 0) {
+        try {
+          final studentId = await _resolveCurrentStudentIdOrEmpty();
+          if (studentId.isNotEmpty) {
+            studentStampState = await _fetchActivityCardStampState(
+              studentId: studentId,
+              termId: activeTermId,
+            );
+          }
+        } catch (_) {
+          studentStampState = false;
+        }
+      }
+    }
 
     setState(() {
       _rowOneActivities = capped.take(_maxItemsPerRow).toList(growable: false);
@@ -249,14 +287,30 @@ class _StudentActivityCardScreenState extends State<StudentActivityCardScreen> {
           .take(_maxItemsPerRow)
           .toList(growable: false);
       _isOfficiallyCleared = isOfficiallyCleared;
-      _isStampedByAdmin = stampState;
+      _isAdminActivityCardStamped = adminStampState;
+      _isStampedByAdmin = studentStampState;
     });
   }
 
   bool get _shouldShowOfficialStamp =>
       _isOfficiallyCleared && _isStampedByAdmin;
 
-  void _onStampCardPressed() {
+  Future<void> _onStampCardPressed() async {
+    if (_isStampingCard) {
+      return;
+    }
+
+    if (!_isAdminActivityCardStamped) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Stamp your admin activity card first before stamping students.',
+          ),
+        ),
+      );
+      return;
+    }
+
     if (!_isOfficiallyCleared) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -275,13 +329,65 @@ class _StudentActivityCardScreenState extends State<StudentActivityCardScreen> {
       return;
     }
 
+    final activeTermId = _activeAcademicTerm?.id ?? 0;
+    if (activeTermId <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No active academic term available.')),
+      );
+      return;
+    }
+
+    final studentId = await _resolveCurrentStudentIdOrEmpty();
+    if (studentId.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to resolve student account.')),
+      );
+      return;
+    }
+
     setState(() {
-      _isStampedByAdmin = true;
+      _isStampingCard = true;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Activity card stamped successfully.')),
-    );
+    try {
+      await _stampActivityCardForTerm(
+        studentId: studentId,
+        termId: activeTermId,
+        isCleared: _isOfficiallyCleared,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isStampedByAdmin = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Activity card stamped successfully.')),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to stamp activity card.')),
+      );
+    } finally {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isStampingCard = false;
+      });
+    }
   }
 
   Future<void> _clearStudentRequirements() async {
@@ -874,6 +980,65 @@ class _StudentActivityCardScreenState extends State<StudentActivityCardScreen> {
         .inFilter('requirement_id', requirementIds);
   }
 
+  Future<bool> _fetchActivityCardStampState({
+    required String studentId,
+    required int termId,
+  }) async {
+    final response = await Supabase.instance.client
+        .from(_activityCardsTable)
+        .select('is_stamp')
+        .eq('student_id', studentId)
+        .eq('term_id', termId)
+        .maybeSingle();
+
+    if (response == null) {
+      return false;
+    }
+
+    final stampValue = response['is_stamp'];
+    if (stampValue is bool) {
+      return stampValue;
+    }
+
+    return _readLabel(stampValue).toLowerCase() == 'true';
+  }
+
+  Future<bool> _fetchAdminActivityCardStampState({
+    required int adminId,
+    required int termId,
+  }) async {
+    final response = await Supabase.instance.client
+        .from(_adminActivityCardsTable)
+        .select('is_stamp')
+        .eq('admin_id', adminId)
+        .eq('term_id', termId)
+        .maybeSingle();
+
+    if (response == null) {
+      return false;
+    }
+
+    final stampValue = response['is_stamp'];
+    if (stampValue is bool) {
+      return stampValue;
+    }
+
+    return _readLabel(stampValue).toLowerCase() == 'true';
+  }
+
+  Future<void> _stampActivityCardForTerm({
+    required String studentId,
+    required int termId,
+    required bool isCleared,
+  }) async {
+    await Supabase.instance.client.from(_activityCardsTable).upsert({
+      'student_id': studentId,
+      'term_id': termId,
+      'is_cleared': isCleared,
+      'is_stamp': true,
+    }, onConflict: 'student_id,term_id');
+  }
+
   Future<List<(String, bool)>> _buildActivityItems(
     List<_ObligatoryActivity> requirements,
   ) async {
@@ -1119,6 +1284,32 @@ class _StudentActivityCardScreenState extends State<StudentActivityCardScreen> {
     }
   }
 
+  Future<int> _resolveCurrentAdminIdOrZero() async {
+    final user = SupabaseAuthService.currentUser;
+    final metadata = user?.userMetadata ?? const <String, dynamic>{};
+
+    final metadataAdminId = _readInt(metadata['admin_id']);
+    if (metadataAdminId > 0) {
+      return metadataAdminId;
+    }
+
+    final email = _readLabel(user?.email);
+    if (email.isEmpty) {
+      return 0;
+    }
+
+    try {
+      final row = await Supabase.instance.client
+          .from(_adminsTable)
+          .select('id')
+          .ilike('email', email)
+          .maybeSingle();
+      return _readInt(row?['id']);
+    } catch (_) {
+      return 0;
+    }
+  }
+
   String _normalizeRequirementType(dynamic value) {
     final normalized = _readLabel(value).toLowerCase();
     if (normalized.startsWith('event')) {
@@ -1196,17 +1387,31 @@ class _StudentActivityCardScreenState extends State<StudentActivityCardScreen> {
       data: Theme.of(context).copyWith(textTheme: textTheme),
       child: Scaffold(
         backgroundColor: Colors.white,
-        floatingActionButton: FloatingActionButton(
-          onPressed: _isApplyingClearance ? null : _onStampCardPressed,
-          tooltip: _isStampedByAdmin
-              ? 'Card already stamped'
-              : 'Stamp activity card',
-          backgroundColor: _isStampedByAdmin ? royalBlue : gold,
-          foregroundColor: _isStampedByAdmin ? gold : royalBlue,
-          child: Icon(
-            _isStampedByAdmin ? Ionicons.ribbon : Ionicons.ribbon_outline,
-          ),
-        ),
+        floatingActionButton: _isAdminActivityCardStamped
+            ? FloatingActionButton(
+                onPressed: _isApplyingClearance || _isStampingCard
+                    ? null
+                    : _onStampCardPressed,
+                tooltip: _isStampingCard
+                    ? 'Stamping activity card...'
+                    : _isStampedByAdmin
+                    ? 'Card already stamped'
+                    : 'Stamp activity card',
+                backgroundColor: _isStampedByAdmin ? royalBlue : gold,
+                foregroundColor: _isStampedByAdmin ? gold : royalBlue,
+                child: _isStampingCard
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        _isStampedByAdmin
+                            ? Ionicons.ribbon
+                            : Ionicons.ribbon_outline,
+                      ),
+              )
+            : null,
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         body: Stack(
           children: [

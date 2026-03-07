@@ -31,6 +31,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
   static const String _eventsTable = 'events';
   static const String _paymentRequirementsTable = 'payment_requirements';
   static const String _adminsTable = 'admins';
+  static const String _adminActivityCardsTable = 'admin_activity_cards';
 
   static const String _eventRequirementType = 'event';
   static const String _paymentRequirementType = 'payment';
@@ -38,6 +39,8 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
   List<(String, bool)> _rowOneActivities = const [];
   List<(String, bool)> _rowTwoActivities = const [];
   bool _isOfficiallyCleared = false;
+  bool _isStampingCard = false;
+  bool _isStampedByAdmin = false;
   AcademicTermOption? _activeAcademicTerm;
 
   @override
@@ -195,6 +198,24 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
     final capped = activities.take(_maxItemsTotal).toList(growable: false);
     final isOfficiallyCleared =
         capped.isNotEmpty && capped.every((item) => item.$2);
+    var stampState = false;
+
+    if (isOfficiallyCleared) {
+      final termId = _activeAcademicTerm?.id ?? 0;
+      if (termId > 0) {
+        try {
+          final adminId = await _resolveCurrentAdminIdOrZero();
+          if (adminId > 0) {
+            stampState = await _fetchAdminActivityCardStampState(
+              adminId: adminId,
+              termId: termId,
+            );
+          }
+        } catch (_) {
+          stampState = false;
+        }
+      }
+    }
 
     setState(() {
       _rowOneActivities = capped.take(_maxItemsPerRow).toList(growable: false);
@@ -203,7 +224,155 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
           .take(_maxItemsPerRow)
           .toList(growable: false);
       _isOfficiallyCleared = isOfficiallyCleared;
+      _isStampedByAdmin = stampState;
     });
+  }
+
+  bool get _shouldShowOfficialStamp =>
+      _isOfficiallyCleared && _isStampedByAdmin;
+
+  Future<void> _onStampCardPressed() async {
+    if (_isStampingCard) {
+      return;
+    }
+
+    if (!_isOfficiallyCleared) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'All mandatory requirements must be cleared before stamping.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final activeTermId = _activeAcademicTerm?.id ?? 0;
+    if (activeTermId <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No active academic term available.')),
+      );
+      return;
+    }
+
+    final adminId = await _resolveCurrentAdminIdOrZero();
+    if (adminId <= 0) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to resolve admin account.')),
+      );
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isStampingCard = true;
+    });
+
+    try {
+      await _stampAdminActivityCardForTerm(
+        adminId: adminId,
+        termId: activeTermId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isStampedByAdmin = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Activity card stamped successfully.')),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to stamp activity card.')),
+      );
+    } finally {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isStampingCard = false;
+      });
+    }
+  }
+
+  Future<bool> _fetchAdminActivityCardStampState({
+    required int adminId,
+    required int termId,
+  }) async {
+    final response = await Supabase.instance.client
+        .from(_adminActivityCardsTable)
+        .select('is_stamp')
+        .eq('admin_id', adminId)
+        .eq('term_id', termId)
+        .maybeSingle();
+
+    if (response == null) {
+      return false;
+    }
+
+    final stampValue = response['is_stamp'];
+    if (stampValue is bool) {
+      return stampValue;
+    }
+
+    return _readLabel(stampValue).toLowerCase() == 'true';
+  }
+
+  Future<void> _stampAdminActivityCardForTerm({
+    required int adminId,
+    required int termId,
+  }) async {
+    await Supabase.instance.client.from(_adminActivityCardsTable).upsert({
+      'admin_id': adminId,
+      'term_id': termId,
+      'is_stamp': true,
+    }, onConflict: 'admin_id,term_id');
+  }
+
+  Future<int> _resolveCurrentAdminIdOrZero() async {
+    final user = SupabaseAuthService.currentUser;
+    final metadata = user?.userMetadata ?? const <String, dynamic>{};
+    final metadataAdminId = _readInt(metadata['admin_id']);
+    if (metadataAdminId > 0) {
+      return metadataAdminId;
+    }
+
+    final visibleAdminId = _readInt(_adminId.replaceFirst('Admin ID:', ''));
+    if (visibleAdminId > 0) {
+      return visibleAdminId;
+    }
+
+    final email = _readLabel(user?.email);
+    if (email.isEmpty) {
+      return 0;
+    }
+
+    try {
+      final row = await Supabase.instance.client
+          .from(_adminsTable)
+          .select('id')
+          .ilike('email', email)
+          .maybeSingle();
+      return _readInt(row?['id']);
+    } catch (_) {
+      return 0;
+    }
   }
 
   Future<List<(String, bool)>> _buildActivityItems(
@@ -389,11 +558,32 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme);
+    final isStampedByAdmin = _isStampedByAdmin;
 
     return Theme(
       data: Theme.of(context).copyWith(textTheme: textTheme),
       child: Scaffold(
         backgroundColor: Colors.white,
+        floatingActionButton: FloatingActionButton(
+          onPressed: _isStampingCard ? null : _onStampCardPressed,
+          tooltip: _isStampingCard
+              ? 'Stamping activity cards...'
+              : isStampedByAdmin
+              ? 'Card already stamped'
+              : 'Stamp activity card',
+          backgroundColor: isStampedByAdmin ? royalBlue : gold,
+          foregroundColor: isStampedByAdmin ? gold : royalBlue,
+          child: _isStampingCard
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(
+                  isStampedByAdmin ? Ionicons.ribbon : Ionicons.ribbon_outline,
+                ),
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         body: Stack(
           children: [
             Positioned(
@@ -526,7 +716,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
               ),
             ),
             Positioned(top: 80, left: -48, child: _buildProfileSection()),
-            if (_isOfficiallyCleared)
+            if (_shouldShowOfficialStamp)
               Positioned(
                 left: -60,
                 bottom: 12,
@@ -535,7 +725,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
                   child: _buildOfficiallyClearedTab(),
                 ),
               ),
-            if (_isOfficiallyCleared)
+            if (_shouldShowOfficialStamp)
               Positioned(
                 left: 83,
                 bottom: 37,

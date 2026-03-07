@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../data/academic_term_service.dart';
 import '../../data/supabase_student_management_impl.dart';
+import '../../../auth/data/supabase_auth_service.dart';
 import '../../domain/student_directory_query.dart';
 import '../../domain/student_entity.dart';
 import '../../domain/student_management_repository.dart';
@@ -22,6 +23,16 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
   final StudentManagementRepository _studentRepository =
       SupabaseStudentManagementImpl.instance;
   static const String _allProgramsLabel = 'All';
+  static const String _clearedTabLabel = 'Cleared';
+
+  static const String _adminsTable = 'admins';
+  static const String _eventsTable = 'events';
+  static const String _paymentRequirementsTable = 'payment_requirements';
+  static const String _eventAttendanceTable = 'event_attendance';
+  static const String _transactionsTable = 'student_transactions';
+  static const String _activityCardsTable = 'activity_cards';
+  static const String _adminActivityCardsTable = 'admin_activity_cards';
+
   String _selectedTab = 'All';
   String _selectedProgram = _allProgramsLabel;
 
@@ -30,8 +41,10 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
   String? _studentsLoadError;
   bool _isSelectionMode = false;
   bool _isBulkActionRunning = false;
+  bool _isAdminActivityCardStamped = false;
   bool _isLoadingAcademicTerms = true;
   final Set<String> _selectedStudentIds = <String>{};
+  Set<String> _clearedStudentIds = <String>{};
   List<AcademicTermOption> _academicTerms = const <AcademicTermOption>[];
   AcademicTermOption? _activeAcademicTerm;
 
@@ -66,6 +79,7 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
   }
 
   Future<void> _loadAcademicTerms() async {
+    final previousActiveTermId = _activeAcademicTerm?.id ?? 0;
     List<AcademicTermOption> terms = const <AcademicTermOption>[];
 
     try {
@@ -90,11 +104,23 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
       return;
     }
 
+    final nextActiveTermId = activeTerm?.id ?? 0;
+    final didChangeActiveTerm = previousActiveTermId != nextActiveTermId;
+
     setState(() {
       _academicTerms = terms;
       _activeAcademicTerm = activeTerm;
       _isLoadingAcademicTerms = false;
+
+      if (didChangeActiveTerm) {
+        _clearedStudentIds = <String>{};
+        _isAdminActivityCardStamped = false;
+        _selectedStudentIds.clear();
+        _isSelectionMode = false;
+      }
     });
+
+    await _refreshClearanceAndAdminStampState();
   }
 
   Future<void> _loadStudents() async {
@@ -134,6 +160,8 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
           _selectedProgram = _allProgramsLabel;
         }
       });
+
+      await _refreshClearanceAndAdminStampState();
     } catch (_) {
       if (!mounted) {
         return;
@@ -224,11 +252,45 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
     );
   }
 
-  Future<void> _activateSelectedStudents() async {
+  Future<void> _stampSelectedStudents() async {
+    if (_selectedStudentIds.isEmpty || _isBulkActionRunning) {
+      return;
+    }
+
+    if (!_isAdminActivityCardStamped) {
+      _showErrorMessage(
+        'Stamp action is locked until admin activity card is stamped.',
+      );
+      return;
+    }
+
+    final termId = _activeAcademicTerm?.id ?? 0;
+    if (termId <= 0) {
+      _showErrorMessage('No active academic term selected.');
+      return;
+    }
+
+    final selectedIds = _normalizeStudentIds(_selectedStudentIds.toList());
+    final stampableStudentIds = selectedIds
+        .where((studentId) => _clearedStudentIds.contains(studentId))
+        .toList(growable: false);
+
+    if (stampableStudentIds.isEmpty) {
+      _showErrorMessage('Only cleared students can be stamped.');
+      return;
+    }
+
+    final skippedCount = selectedIds.length - stampableStudentIds.length;
+    final successMessage = skippedCount > 0
+        ? 'Stamped ${stampableStudentIds.length} cleared student(s). '
+              '$skippedCount selected student(s) are not cleared.'
+        : 'Selected students were stamped.';
+
     await _runBulkAction(
-      action: _studentRepository.activateStudents,
-      successMessage: 'Selected students were activated.',
-      failureMessage: 'Unable to activate selected students.',
+      action: (studentIds) => _stampStudentsForTerm(studentIds, termId),
+      successMessage: successMessage,
+      failureMessage: 'Unable to stamp selected students.',
+      studentIdsOverride: stampableStudentIds,
     );
   }
 
@@ -340,12 +402,18 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
     required Future<void> Function(List<String> studentIds) action,
     required String successMessage,
     required String failureMessage,
+    List<String>? studentIdsOverride,
   }) async {
-    if (_selectedStudentIds.isEmpty || _isBulkActionRunning) {
+    if (_isBulkActionRunning) {
       return;
     }
 
-    final selectedStudentIds = _selectedStudentIds.toList();
+    final selectedStudentIds = _normalizeStudentIds(
+      studentIdsOverride ?? _selectedStudentIds.toList(),
+    );
+    if (selectedStudentIds.isEmpty) {
+      return;
+    }
 
     setState(() {
       _isBulkActionRunning = true;
@@ -364,6 +432,7 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
       });
 
       await _loadStudents();
+      await _refreshClearanceAndAdminStampState();
 
       if (!mounted) {
         return;
@@ -390,13 +459,327 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
   }
 
   List<StudentEntity> get _filteredStudents {
-    return StudentDirectoryQuery.filterStudents(
+    final tabForStatusFilter = _selectedTab == _clearedTabLabel
+        ? 'All'
+        : _selectedTab;
+
+    final students = StudentDirectoryQuery.filterStudents(
       students: _allStudents,
       query: _searchController.text,
-      selectedStatus: _selectedTab,
+      selectedStatus: tabForStatusFilter,
       selectedProgram: _selectedProgram,
       allProgramsLabel: _allProgramsLabel,
     );
+
+    if (_selectedTab != _clearedTabLabel) {
+      return students;
+    }
+
+    return students
+        .where((student) => _clearedStudentIds.contains(student.studentId))
+        .toList(growable: false);
+  }
+
+  Future<void> _stampStudentsForTerm(
+    List<String> studentIds,
+    int termId,
+  ) async {
+    if (termId <= 0) {
+      return;
+    }
+
+    final normalizedStudentIds = _normalizeStudentIds(studentIds);
+    if (normalizedStudentIds.isEmpty) {
+      return;
+    }
+
+    final rows = normalizedStudentIds
+        .map(
+          (studentId) => {
+            'student_id': studentId,
+            'term_id': termId,
+            'is_cleared': true,
+            'is_stamp': true,
+          },
+        )
+        .toList(growable: false);
+
+    await Supabase.instance.client
+        .from(_activityCardsTable)
+        .upsert(rows, onConflict: 'student_id,term_id');
+  }
+
+  List<String> _normalizeStudentIds(List<String> studentIds) {
+    return studentIds
+        .map((studentId) => studentId.trim())
+        .where((studentId) => studentId.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+  }
+
+  Future<void> _refreshClearanceAndAdminStampState() async {
+    final termId = _activeAcademicTerm?.id ?? 0;
+    if (termId <= 0) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isAdminActivityCardStamped = false;
+        _clearedStudentIds = <String>{};
+      });
+      return;
+    }
+
+    final candidateStudentIds = _allStudents
+        .map((student) => student.studentId.trim())
+        .where((studentId) => studentId.isNotEmpty)
+        .toSet();
+
+    var adminStamped = false;
+    var clearedStudentIds = <String>{};
+
+    try {
+      final adminId = await _resolveCurrentAdminIdOrZero();
+      if (adminId > 0) {
+        adminStamped = await _fetchAdminActivityCardStampState(
+          adminId: adminId,
+          termId: termId,
+        );
+      }
+    } catch (_) {
+      adminStamped = false;
+    }
+
+    try {
+      clearedStudentIds = await _fetchClearedStudentIdsForTerm(
+        termId: termId,
+        candidateStudentIds: candidateStudentIds,
+      );
+    } catch (_) {
+      clearedStudentIds = <String>{};
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isAdminActivityCardStamped = adminStamped;
+      _clearedStudentIds = clearedStudentIds;
+    });
+  }
+
+  Future<bool> _fetchAdminActivityCardStampState({
+    required int adminId,
+    required int termId,
+  }) async {
+    final response = await Supabase.instance.client
+        .from(_adminActivityCardsTable)
+        .select('is_stamp')
+        .eq('admin_id', adminId)
+        .eq('term_id', termId)
+        .maybeSingle();
+
+    if (response == null) {
+      return false;
+    }
+
+    final stampValue = response['is_stamp'];
+    if (stampValue is bool) {
+      return stampValue;
+    }
+
+    return stampValue?.toString().toLowerCase() == 'true';
+  }
+
+  Future<Set<String>> _fetchClearedStudentIdsForTerm({
+    required int termId,
+    required Set<String> candidateStudentIds,
+  }) async {
+    if (candidateStudentIds.isEmpty) {
+      return <String>{};
+    }
+
+    final client = Supabase.instance.client;
+
+    final eventRows = await client
+        .from(_eventsTable)
+        .select('id')
+        .eq('term_id', termId)
+        .eq('is_mandatory', true);
+
+    final paymentRows = await client
+        .from(_paymentRequirementsTable)
+        .select('id')
+        .eq('term_id', termId)
+        .eq('is_mandatory', true);
+
+    final mandatoryEventIds = List<Map<String, dynamic>>.from(
+      eventRows,
+    ).map((row) => _readInt(row['id'])).where((id) => id > 0).toSet();
+
+    final mandatoryPaymentIds = List<Map<String, dynamic>>.from(
+      paymentRows,
+    ).map((row) => _readInt(row['id'])).where((id) => id > 0).toSet();
+
+    if (mandatoryEventIds.isEmpty && mandatoryPaymentIds.isEmpty) {
+      return <String>{};
+    }
+
+    final normalizedStudentIds = candidateStudentIds.toList(growable: false);
+
+    final completedEventsByStudent = await _fetchCompletedEventsByStudent(
+      eventIds: mandatoryEventIds.toList(growable: false),
+      studentIds: normalizedStudentIds,
+    );
+    final clearedPaymentsByStudent = await _fetchClearedPaymentsByStudent(
+      requirementIds: mandatoryPaymentIds.toList(growable: false),
+      studentIds: normalizedStudentIds,
+    );
+
+    final clearedStudentIds = <String>{};
+    for (final studentId in normalizedStudentIds) {
+      final completedEventIds =
+          completedEventsByStudent[studentId] ?? const <int>{};
+      final clearedPaymentIds =
+          clearedPaymentsByStudent[studentId] ?? const <int>{};
+
+      final eventsCleared = mandatoryEventIds.every(completedEventIds.contains);
+      final paymentsCleared = mandatoryPaymentIds.every(
+        clearedPaymentIds.contains,
+      );
+
+      if (eventsCleared && paymentsCleared) {
+        clearedStudentIds.add(studentId);
+      }
+    }
+
+    return clearedStudentIds;
+  }
+
+  Future<Map<String, Set<int>>> _fetchCompletedEventsByStudent({
+    required List<int> eventIds,
+    required List<String> studentIds,
+  }) async {
+    if (eventIds.isEmpty || studentIds.isEmpty) {
+      return const <String, Set<int>>{};
+    }
+
+    final response = await Supabase.instance.client
+        .from(_eventAttendanceTable)
+        .select(
+          'student_id, event_id, scanned_time_in, scanned_time_out, status',
+        )
+        .inFilter('event_id', eventIds)
+        .inFilter('student_id', studentIds);
+
+    final rows = List<Map<String, dynamic>>.from(response);
+    final completedEventsByStudent = <String, Set<int>>{};
+
+    for (final row in rows) {
+      final studentId = row['student_id']?.toString().trim() ?? '';
+      final eventId = _readInt(row['event_id']);
+      if (studentId.isEmpty || eventId <= 0) {
+        continue;
+      }
+
+      final status = row['status']?.toString().trim().toLowerCase() ?? '';
+      final hasTimeIn =
+          (row['scanned_time_in']?.toString().trim().isNotEmpty ?? false);
+      final hasTimeOut =
+          (row['scanned_time_out']?.toString().trim().isNotEmpty ?? false);
+      final isCompleted = status == 'completed' || (hasTimeIn && hasTimeOut);
+
+      if (!isCompleted) {
+        continue;
+      }
+
+      completedEventsByStudent
+          .putIfAbsent(studentId, () => <int>{})
+          .add(eventId);
+    }
+
+    return completedEventsByStudent;
+  }
+
+  Future<Map<String, Set<int>>> _fetchClearedPaymentsByStudent({
+    required List<int> requirementIds,
+    required List<String> studentIds,
+  }) async {
+    if (requirementIds.isEmpty || studentIds.isEmpty) {
+      return const <String, Set<int>>{};
+    }
+
+    final response = await Supabase.instance.client
+        .from(_transactionsTable)
+        .select('student_id, requirement_id, status')
+        .inFilter('requirement_id', requirementIds)
+        .inFilter('student_id', studentIds);
+
+    final rows = List<Map<String, dynamic>>.from(response);
+    final clearedPaymentsByStudent = <String, Set<int>>{};
+
+    for (final row in rows) {
+      final studentId = row['student_id']?.toString().trim() ?? '';
+      final requirementId = _readInt(row['requirement_id']);
+      if (studentId.isEmpty || requirementId <= 0) {
+        continue;
+      }
+
+      final status = row['status']?.toString().trim().toLowerCase() ?? '';
+      final isRejected = status == 'rejected' || status == 'declined';
+      if (isRejected) {
+        continue;
+      }
+
+      clearedPaymentsByStudent
+          .putIfAbsent(studentId, () => <int>{})
+          .add(requirementId);
+    }
+
+    return clearedPaymentsByStudent;
+  }
+
+  Future<int> _resolveCurrentAdminIdOrZero() async {
+    final user = SupabaseAuthService.currentUser;
+    final metadata = user?.userMetadata ?? const <String, dynamic>{};
+    final metadataAdminId = _readInt(metadata['admin_id']);
+    if (metadataAdminId > 0) {
+      return metadataAdminId;
+    }
+
+    final email = user?.email?.trim().toLowerCase() ?? '';
+    if (email.isEmpty) {
+      return 0;
+    }
+
+    try {
+      final row = await Supabase.instance.client
+          .from(_adminsTable)
+          .select('id')
+          .ilike('email', email)
+          .maybeSingle();
+      return _readInt(row?['id']);
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  int _readInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
+    }
+
+    if (value is String) {
+      return int.tryParse(value.trim()) ?? 0;
+    }
+
+    return 0;
   }
 
   @override
@@ -1583,7 +1966,12 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                               padding: const EdgeInsets.only(right: 12),
                               child: _buildProgramDropdownChip(),
                             ),
-                            ...['All', 'Active', 'Frozen'].map((tab) {
+                            ...[
+                              'All',
+                              'Active',
+                              'Frozen',
+                              _clearedTabLabel,
+                            ].map((tab) {
                               final isSelected = _selectedTab == tab;
                               return Padding(
                                 padding: const EdgeInsets.only(right: 12),
@@ -1689,6 +2077,9 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
     final allVisibleSelected = _allVisibleStudentsSelected(filteredStudents);
     final hasSelectedStudents = _selectedStudentIds.isNotEmpty;
     final isFrozenTab = _selectedTab == 'Frozen';
+    final isClearedTab = _selectedTab == _clearedTabLabel;
+    final usesStampAction = isFrozenTab || isClearedTab;
+    final isStampLocked = usesStampAction && !_isAdminActivityCardStamped;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -1775,6 +2166,8 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                   Text(
                     _isBulkActionRunning
                         ? 'Applying changes to selected students...'
+                        : isStampLocked
+                        ? 'Stamp action is locked until admin activity card is stamped.'
                         : 'Choose students, then select an action.',
                     style: TextStyle(
                       color: Colors.black.withOpacity(0.6),
@@ -1816,16 +2209,19 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                     children: [
                       Expanded(
                         child: _buildBulkChoiceButton(
-                          label: isFrozenTab
-                              ? 'Activate Selected'
+                          label: usesStampAction
+                              ? 'Stamp Selected'
                               : 'Freeze Selected',
-                          icon: isFrozenTab
-                              ? Ionicons.checkmark_circle_outline
+                          icon: usesStampAction
+                              ? Ionicons.ribbon_outline
                               : Ionicons.snow_outline,
                           onPressed:
-                              hasSelectedStudents && !_isBulkActionRunning
-                              ? (isFrozenTab
-                                    ? _activateSelectedStudents
+                              hasSelectedStudents &&
+                                  !_isBulkActionRunning &&
+                                  (!usesStampAction ||
+                                      _isAdminActivityCardStamped)
+                              ? (usesStampAction
+                                    ? _stampSelectedStudents
                                     : _freezeSelectedStudents)
                               : null,
                         ),
