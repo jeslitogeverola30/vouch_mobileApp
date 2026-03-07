@@ -26,7 +26,7 @@ class AdminProfileScreen extends StatefulWidget {
     this.adminRole = 'Admin',
     this.adminEmail = 'jeslito.geverola@dorsu.edu.ph',
     this.facultyName = 'Faculty of Computing, Engineering, and Technology',
-    this.avatarUrl = 'https://via.placeholder.com/150?text=ACES',
+    this.avatarUrl = 'assets/images/my_profile.png',
   });
 
   @override
@@ -305,6 +305,23 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
   }
 
   Widget _buildAvatarImage() {
+    if (_avatarUrl.startsWith('assets/')) {
+      return Image.asset(
+        _avatarUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: const Color(0xFFE8F0F8),
+            child: const Icon(
+              Ionicons.person,
+              size: 22,
+              color: Color(0xFF003DA5),
+            ),
+          );
+        },
+      );
+    }
+
     if (_avatarUrl.isNotEmpty) {
       return Image.network(
         _avatarUrl,
@@ -322,9 +339,19 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
       );
     }
 
-    return Container(
-      color: const Color(0xFFE8F0F8),
-      child: const Icon(Ionicons.person, size: 22, color: Color(0xFF003DA5)),
+    return Image.asset(
+      'assets/images/my_profile.png',
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          color: const Color(0xFFE8F0F8),
+          child: const Icon(
+            Ionicons.person,
+            size: 22,
+            color: Color(0xFF003DA5),
+          ),
+        );
+      },
     );
   }
 

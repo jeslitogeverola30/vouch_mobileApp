@@ -401,11 +401,11 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
       }
 
       final status = _readLabel(row['status']).toLowerCase();
-      final hasAnyScan =
-          _readLabel(row['scanned_time_in']).isNotEmpty ||
-          _readLabel(row['scanned_time_out']).isNotEmpty;
+      final hasTimeIn = _readLabel(row['scanned_time_in']).isNotEmpty;
+      final hasTimeOut = _readLabel(row['scanned_time_out']).isNotEmpty;
+      final isCompleted = status == 'completed' || (hasTimeIn && hasTimeOut);
 
-      if (hasAnyScan || status == 'present' || status == 'completed') {
+      if (isCompleted) {
         activeEventIds.add(eventId);
       }
     }
