@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/data/local/database_helper.dart';
 import '../../../../core/services/avatar_sync_service.dart';
@@ -18,34 +19,27 @@ class ActivityCardScreen extends StatefulWidget {
 }
 
 class _ActivityCardScreenState extends State<ActivityCardScreen> {
-  String _studentName = 'Jeslito G. Geverola';
-  String _studentProgram = 'BS - Information Technology';
-  String _studentId = '2023-0222';
+  String _studentName = '';
+  String _studentProgram = '';
+  String _studentId = '';
   String _avatarUrl = '';
 
-  static const _rowOneActivities = [
-    //7 max items
-    ('General Cleaning', false),
-    ('ACES Membership Fee', false),
-    ('CB Membership Fee', true),
-    ('Panaghigalaay', false),
-    ('Siglakas Fee', false),
-    ('Panaghigalaay', false),
-    ('Siglakas Fee', false),
-    ('Panaghigalaay', false),
-  ];
+  static const int _maxItemsPerRow = 8;
+  static const int _maxItemsTotal = _maxItemsPerRow * 2;
 
-  static const _rowTwoActivities = [
-    //7 max items
-    ('General Meeting', false),
-    ('Siglakas Attendance', false),
-    ('FaCETLABAN', true),
-    ('Community Service', false),
-    ('Skills Training', false),
-    ('Community Service', false),
-    ('Skills Training', false),
-    ('Skills Training', false),
-  ];
+  static const String _requirementsView = 'obligatory_requirements';
+  static const String _eventsTable = 'events';
+  static const String _paymentRequirementsTable = 'payment_requirements';
+  static const String _studentsTable = 'students';
+  static const String _eventAttendanceTable = 'event_attendance';
+  static const String _transactionsTable = 'student_transactions';
+
+  static const String _eventRequirementType = 'event';
+  static const String _paymentRequirementType = 'payment';
+
+  List<(String, bool)> _rowOneActivities = const [];
+  List<(String, bool)> _rowTwoActivities = const [];
+  bool _isOfficiallyCleared = false;
 
   @override
   void initState() {
@@ -59,42 +53,94 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadStudentProfile();
+      _loadObligatoryActivities();
     });
   }
 
   Future<void> _loadStudentProfile() async {
-    final email = SupabaseAuthService.currentUser?.email;
+    final currentUser = SupabaseAuthService.currentUser;
+    final email = _readLabel(currentUser?.email);
+    final metadata = currentUser?.userMetadata ?? const <String, dynamic>{};
 
-    Map<String, dynamic>? student;
+    final localStudentData = <String, dynamic>{};
+    final remoteStudentData = <String, dynamic>{};
+    final profileStudentData = <String, dynamic>{};
+    final student = <String, dynamic>{};
+
     try {
-      student =
-          (await SupabaseProfileRepositoryImpl.instance.getCurrentUserProfile())
-              ?.toMap();
+      final profile = await SupabaseProfileRepositoryImpl.instance
+          .getCurrentUserProfile();
+      if (profile != null) {
+        profileStudentData.addAll(profile.toMap());
+      }
     } catch (_) {
-      student = null;
+      // Ignore and continue with other fallbacks.
     }
 
-    if (student == null && email != null && email.isNotEmpty) {
-      student = await DatabaseHelper.instance.getStudentByEmail(email);
+    if (email.isNotEmpty) {
+      try {
+        final remoteStudentRow = await Supabase.instance.client
+            .from(_studentsTable)
+            .select('email, full_name, student_id, program, profile_photo_url')
+            .ilike('email', email)
+            .maybeSingle();
+        if (remoteStudentRow != null) {
+          remoteStudentData.addAll(Map<String, dynamic>.from(remoteStudentRow));
+        }
+      } catch (_) {
+        // Ignore and continue with local DB fallback.
+      }
+
+      final localStudentRow = await DatabaseHelper.instance.getStudentByEmail(
+        email,
+      );
+      if (localStudentRow != null) {
+        localStudentData.addAll(localStudentRow);
+      }
     }
 
-    if (student == null || !mounted) {
+    student
+      ..addAll(localStudentData)
+      ..addAll(remoteStudentData)
+      ..addAll(profileStudentData);
+
+    final resolvedName = _firstNonEmpty([
+      student['full_name'],
+      student['fullName'],
+      metadata['full_name'],
+      _metadataCombinedName(metadata),
+      'Student',
+    ]);
+    final resolvedProgram = _firstNonEmpty([
+      student['program'],
+      metadata['program'],
+      'N/A',
+    ]);
+    final resolvedStudentId = _firstNonEmpty([
+      student['student_id'],
+      student['studentId'],
+      metadata['student_id'],
+      'N/A',
+    ]);
+    final resolvedAvatarUrl = _firstNonEmpty([
+      student['profile_photo_url'],
+      student['profilePhotoUrl'],
+      _avatarUrl,
+    ]);
+    final resolvedEmail = _firstNonEmpty([student['email'], email]);
+
+    if (!mounted) {
       return;
     }
 
     setState(() {
-      _studentName = (student!['full_name'] as String? ?? _studentName).trim();
-      _studentProgram = (student['program'] as String? ?? _studentProgram)
-          .trim();
-      _studentId = (student['student_id'] as String? ?? _studentId).trim();
-      _avatarUrl = (student['profile_photo_url'] as String? ?? _avatarUrl)
-          .trim();
+      _studentName = resolvedName;
+      _studentProgram = resolvedProgram;
+      _studentId = resolvedStudentId;
+      _avatarUrl = resolvedAvatarUrl;
     });
 
-    AvatarSyncService.setAvatar(
-      email: (student['email'] as String?) ?? email,
-      avatarUrl: _avatarUrl,
-    );
+    AvatarSyncService.setAvatar(email: resolvedEmail, avatarUrl: _avatarUrl);
   }
 
   String? _normalizedCurrentEmail() {
@@ -104,6 +150,327 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
     }
 
     return email.toLowerCase();
+  }
+
+  Future<void> _loadObligatoryActivities() async {
+    List<(String, bool)> activities = const [];
+
+    try {
+      final requirements = await _fetchObligatoryActivities();
+      activities = await _buildActivityItems(requirements);
+    } catch (_) {
+      activities = const [];
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    final capped = activities.take(_maxItemsTotal).toList(growable: false);
+    final isOfficiallyCleared =
+        capped.isNotEmpty && capped.every((item) => item.$2);
+
+    setState(() {
+      _rowOneActivities = capped.take(_maxItemsPerRow).toList(growable: false);
+      _rowTwoActivities = capped
+          .skip(_maxItemsPerRow)
+          .take(_maxItemsPerRow)
+          .toList(growable: false);
+      _isOfficiallyCleared = isOfficiallyCleared;
+    });
+  }
+
+  Future<List<(String, bool)>> _buildActivityItems(
+    List<_ObligatoryActivity> requirements,
+  ) async {
+    if (requirements.isEmpty) {
+      return const [];
+    }
+
+    final studentId = await _resolveCurrentStudentIdOrEmpty();
+    if (studentId.isEmpty) {
+      return requirements
+          .map<(String, bool)>((item) => (item.label, false))
+          .toList(growable: false);
+    }
+
+    final eventRequirementIds = requirements
+        .where((item) => item.type == _eventRequirementType)
+        .map((item) => item.sourceId)
+        .toSet()
+        .toList(growable: false);
+
+    final paymentRequirementIds = requirements
+        .where((item) => item.type == _paymentRequirementType)
+        .map((item) => item.sourceId)
+        .toSet()
+        .toList(growable: false);
+
+    Set<int> activeEventIds = const <int>{};
+    Set<int> activePaymentIds = const <int>{};
+
+    try {
+      activeEventIds = await _fetchActiveEventIds(
+        studentId,
+        eventRequirementIds,
+      );
+    } catch (_) {
+      activeEventIds = const <int>{};
+    }
+
+    try {
+      activePaymentIds = await _fetchActivePaymentRequirementIds(
+        studentId,
+        paymentRequirementIds,
+      );
+    } catch (_) {
+      activePaymentIds = const <int>{};
+    }
+
+    return requirements
+        .map((item) {
+          final active = item.type == _eventRequirementType
+              ? activeEventIds.contains(item.sourceId)
+              : activePaymentIds.contains(item.sourceId);
+          return (item.label, active);
+        })
+        .take(_maxItemsTotal)
+        .toList(growable: false);
+  }
+
+  Future<List<_ObligatoryActivity>> _fetchObligatoryActivities() async {
+    final client = Supabase.instance.client;
+
+    try {
+      final response = await client
+          .from(_requirementsView)
+          .select(
+            'requirement_type, source_id, title, description, date_or_deadline, amount',
+          )
+          .order('requirement_type', ascending: true)
+          .order('source_id', ascending: true)
+          .limit(_maxItemsTotal);
+
+      return _mapRequirementRows(List<Map<String, dynamic>>.from(response));
+    } on PostgrestException {
+      return _fetchObligatoryActivitiesWithoutView(client);
+    }
+  }
+
+  Future<List<_ObligatoryActivity>> _fetchObligatoryActivitiesWithoutView(
+    SupabaseClient client,
+  ) async {
+    final eventRows = await client
+        .from(_eventsTable)
+        .select('id, name')
+        .eq('is_mandatory', true)
+        .order('event_date', ascending: true)
+        .order('id', ascending: true);
+
+    final paymentRows = await client
+        .from(_paymentRequirementsTable)
+        .select('id, title')
+        .eq('is_mandatory', true)
+        .order('id', ascending: true);
+
+    final events = List<Map<String, dynamic>>.from(eventRows)
+        .map(
+          (row) => _ObligatoryActivity(
+            type: _eventRequirementType,
+            sourceId: _readInt(row['id']),
+            label: _readLabel(row['name']),
+          ),
+        )
+        .where((item) => item.sourceId > 0 && item.label.isNotEmpty);
+
+    final payments = List<Map<String, dynamic>>.from(paymentRows)
+        .map(
+          (row) => _ObligatoryActivity(
+            type: _paymentRequirementType,
+            sourceId: _readInt(row['id']),
+            label: _readLabel(row['title']),
+          ),
+        )
+        .where((item) => item.sourceId > 0 && item.label.isNotEmpty);
+
+    final combined = [...events, ...payments];
+    return combined.take(_maxItemsTotal).toList(growable: false);
+  }
+
+  List<_ObligatoryActivity> _mapRequirementRows(
+    List<Map<String, dynamic>> rows,
+  ) {
+    return rows
+        .map(
+          (row) => _ObligatoryActivity(
+            type: _normalizeRequirementType(row['requirement_type']),
+            sourceId: _readInt(row['source_id']),
+            label: _readLabel(row['title']),
+          ),
+        )
+        .where(
+          (item) =>
+              item.sourceId > 0 &&
+              item.label.isNotEmpty &&
+              (item.type == _eventRequirementType ||
+                  item.type == _paymentRequirementType),
+        )
+        .take(_maxItemsTotal)
+        .toList(growable: false);
+  }
+
+  Future<Set<int>> _fetchActiveEventIds(
+    String studentId,
+    List<int> eventIds,
+  ) async {
+    if (eventIds.isEmpty) {
+      return const <int>{};
+    }
+
+    final response = await Supabase.instance.client
+        .from(_eventAttendanceTable)
+        .select('event_id, scanned_time_in, scanned_time_out, status')
+        .eq('student_id', studentId)
+        .inFilter('event_id', eventIds);
+
+    final rows = List<Map<String, dynamic>>.from(response);
+    final activeEventIds = <int>{};
+
+    for (final row in rows) {
+      final eventId = _readInt(row['event_id']);
+      if (eventId <= 0) {
+        continue;
+      }
+
+      final status = _readLabel(row['status']).toLowerCase();
+      final hasAnyScan =
+          _readLabel(row['scanned_time_in']).isNotEmpty ||
+          _readLabel(row['scanned_time_out']).isNotEmpty;
+
+      if (hasAnyScan || status == 'present' || status == 'completed') {
+        activeEventIds.add(eventId);
+      }
+    }
+
+    return activeEventIds;
+  }
+
+  Future<Set<int>> _fetchActivePaymentRequirementIds(
+    String studentId,
+    List<int> requirementIds,
+  ) async {
+    if (requirementIds.isEmpty) {
+      return const <int>{};
+    }
+
+    final response = await Supabase.instance.client
+        .from(_transactionsTable)
+        .select('requirement_id, status')
+        .eq('student_id', studentId)
+        .inFilter('requirement_id', requirementIds);
+
+    final rows = List<Map<String, dynamic>>.from(response);
+    final activeRequirementIds = <int>{};
+
+    for (final row in rows) {
+      final requirementId = _readInt(row['requirement_id']);
+      if (requirementId <= 0) {
+        continue;
+      }
+
+      final status = _readLabel(row['status']).toLowerCase();
+      final isRejected = status == 'rejected' || status == 'declined';
+      if (!isRejected) {
+        activeRequirementIds.add(requirementId);
+      }
+    }
+
+    return activeRequirementIds;
+  }
+
+  Future<String> _resolveCurrentStudentIdOrEmpty() async {
+    try {
+      final profile = await SupabaseProfileRepositoryImpl.instance
+          .getCurrentUserProfile();
+      final studentId = _readLabel(profile?.studentId);
+      if (studentId.isNotEmpty) {
+        return studentId;
+      }
+    } catch (_) {
+      // Ignore and continue with fallback resolvers.
+    }
+
+    final user = SupabaseAuthService.currentUser;
+    final metadataStudentId = _readLabel(user?.userMetadata?['student_id']);
+    if (metadataStudentId.isNotEmpty) {
+      return metadataStudentId;
+    }
+
+    final email = _readLabel(user?.email);
+    if (email.isEmpty) {
+      return '';
+    }
+
+    try {
+      final student = await Supabase.instance.client
+          .from(_studentsTable)
+          .select('student_id')
+          .ilike('email', email)
+          .maybeSingle();
+      return _readLabel(student?['student_id']);
+    } catch (_) {
+      return '';
+    }
+  }
+
+  String _normalizeRequirementType(dynamic value) {
+    final normalized = _readLabel(value).toLowerCase();
+    if (normalized.startsWith('event')) {
+      return _eventRequirementType;
+    }
+    if (normalized.startsWith('payment')) {
+      return _paymentRequirementType;
+    }
+
+    return normalized;
+  }
+
+  int _readInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
+    }
+
+    if (value is String) {
+      return int.tryParse(value.trim()) ?? 0;
+    }
+
+    return 0;
+  }
+
+  String _firstNonEmpty(List<dynamic> values) {
+    for (final value in values) {
+      final normalized = _readLabel(value);
+      if (normalized.isNotEmpty) {
+        return normalized;
+      }
+    }
+
+    return '';
+  }
+
+  String _metadataCombinedName(Map<String, dynamic> metadata) {
+    final firstName = _readLabel(metadata['first_name']);
+    final lastName = _readLabel(metadata['last_name']);
+    final combined = '$firstName $lastName'.trim();
+    return combined;
+  }
+
+  String _readLabel(dynamic value) {
+    return value?.toString().trim() ?? '';
   }
 
   Widget _buildStudentAvatarImage() {
@@ -272,26 +639,28 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
               ),
             ),
             Positioned(top: 80, left: -48, child: _buildProfileSection()),
-            Positioned(
-              left: -60,
-              bottom: 12,
-              child: Transform.rotate(
-                angle: 1.57079632679,
-                child: _buildOfficiallyClearedTab(),
-              ),
-            ),
-            Positioned(
-              left: 83,
-              bottom: 37,
-              child: Transform.rotate(
-                angle: 1.57079632679,
-                child: SizedBox(
-                  width: 135,
-                  height: 135,
-                  child: _buildClearedStamp(),
+            if (_isOfficiallyCleared)
+              Positioned(
+                left: -60,
+                bottom: 12,
+                child: Transform.rotate(
+                  angle: 1.57079632679,
+                  child: _buildOfficiallyClearedTab(),
                 ),
               ),
-            ),
+            if (_isOfficiallyCleared)
+              Positioned(
+                left: 83,
+                bottom: 37,
+                child: Transform.rotate(
+                  angle: 1.57079632679,
+                  child: SizedBox(
+                    width: 135,
+                    height: 135,
+                    child: _buildClearedStamp(),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -819,4 +1188,16 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
       ),
     );
   }
+}
+
+class _ObligatoryActivity {
+  const _ObligatoryActivity({
+    required this.type,
+    required this.sourceId,
+    required this.label,
+  });
+
+  final String type;
+  final int sourceId;
+  final String label;
 }
