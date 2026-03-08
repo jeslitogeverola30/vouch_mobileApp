@@ -1006,7 +1006,7 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                         ),
                         child: SwitchListTile(
                           value: setAsActive,
-                          activeColor: const Color(0xFF003DA5),
+                          activeThumbColor: const Color(0xFF003DA5),
                           title: const Text(
                             'Set as active term',
                             style: TextStyle(
@@ -1201,7 +1201,7 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                       child: ListView.separated(
                         shrinkWrap: true,
                         itemCount: _academicTerms.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
                         itemBuilder: (_, index) {
                           final term = _academicTerms[index];
                           final isSelected = selectedTermId == term.id;
@@ -1644,7 +1644,7 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                   child: ListView.separated(
                     shrinkWrap: true,
                     itemCount: options.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       final program = options[index];
                       final isSelected = _selectedProgram == program;

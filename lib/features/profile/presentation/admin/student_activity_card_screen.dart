@@ -675,7 +675,7 @@ class _StudentActivityCardScreenState extends State<StudentActivityCardScreen> {
                             child: ListView.separated(
                               shrinkWrap: true,
                               itemCount: unclearedRequirements.length,
-                              separatorBuilder: (_, __) =>
+                              separatorBuilder: (_, _) =>
                                   const SizedBox(height: 8),
                               itemBuilder: (context, index) {
                                 final requirement =

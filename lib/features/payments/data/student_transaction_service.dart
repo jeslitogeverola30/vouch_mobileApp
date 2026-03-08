@@ -393,7 +393,7 @@ class StudentTransactionService {
 
   bool _isMissingColumnError(PostgrestException error, String columnName) {
     final details = '${error.details ?? ''}'.toLowerCase();
-    final hint = '${error.hint ?? ''}'.toLowerCase();
+    final hint = (error.hint ?? '').toLowerCase();
     final message = error.message.toLowerCase();
     final lookup = columnName.trim().toLowerCase();
     final combined = '$message $details $hint';

@@ -331,7 +331,7 @@ class _AdminCreatedFeesScreenState extends State<AdminCreatedFeesScreen> {
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 22),
                   itemCount: visibleFees.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final fee = visibleFees[index];
 

@@ -41,7 +41,7 @@ class _EventsScreenState extends State<AdminEventsScreen>
   late TabController _tabController;
   late Future<List<Map<String, dynamic>>> _eventsFuture;
   late Future<List<Map<String, dynamic>>> _rateEventsFuture;
-  int _selectedNavIndex = 2;
+  final int _selectedNavIndex = 2;
 
   @override
   void initState() {
@@ -1030,7 +1030,7 @@ class _EventsScreenState extends State<AdminEventsScreen>
                     child: ListView.separated(
                       shrinkWrap: true,
                       itemCount: comments.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
                       itemBuilder: (context, index) {
                         final item = comments[index];
                         return Container(

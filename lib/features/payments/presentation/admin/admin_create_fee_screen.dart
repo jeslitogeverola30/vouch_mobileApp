@@ -377,7 +377,7 @@ class _CreateFeeScreenState extends State<CreateFeeScreen> {
                                                 () => _isObligatory = value,
                                               );
                                             },
-                                            activeColor: _gold,
+                                            activeThumbColor: _gold,
                                             inactiveThumbColor: Colors.white,
                                             inactiveTrackColor:
                                                 Colors.grey.shade300,
@@ -549,7 +549,7 @@ class _CreateFeeScreenState extends State<CreateFeeScreen> {
               ),
             ),
             const Spacer(),
-            if (trailing != null) trailing,
+            ?trailing,
           ],
         ),
         const SizedBox(height: 8),

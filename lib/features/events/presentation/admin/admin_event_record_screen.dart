@@ -330,7 +330,7 @@ class _EventRecordScreenState extends State<EventRecordScreen> {
                     child: ListView.separated(
                       shrinkWrap: true,
                       itemCount: _programOptions.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 6),
+                      separatorBuilder: (_, _) => const SizedBox(height: 6),
                       padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                       itemBuilder: (context, index) {
                         final option = _programOptions[index];
@@ -522,7 +522,7 @@ class _EventRecordScreenState extends State<EventRecordScreen> {
                                             physics:
                                                 const AlwaysScrollableScrollPhysics(),
                                             itemCount: _filteredStudents.length,
-                                            separatorBuilder: (_, __) =>
+                                            separatorBuilder: (_, _) =>
                                                 const SizedBox(height: 10),
                                             itemBuilder: (context, index) {
                                               return _buildStudentCard(
@@ -1146,7 +1146,7 @@ class _EventRecordScreenState extends State<EventRecordScreen> {
         child: Image.network(
           student.avatarUrl,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _buildInitialAvatar(initials),
+          errorBuilder: (_, _, _) => _buildInitialAvatar(initials),
         ),
       ),
     );
@@ -1245,7 +1245,7 @@ class _EventRecordScreenState extends State<EventRecordScreen> {
       return Image.asset(
         imagePath,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Container(
+        errorBuilder: (_, _, _) => Container(
           color: lightGray,
           alignment: Alignment.center,
           child: const Icon(Ionicons.image_outline, color: darkGray),
@@ -1256,7 +1256,7 @@ class _EventRecordScreenState extends State<EventRecordScreen> {
     return Image.network(
       imagePath,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
+      errorBuilder: (_, _, _) => Container(
         color: lightGray,
         alignment: Alignment.center,
         child: const Icon(Ionicons.image_outline, color: darkGray),

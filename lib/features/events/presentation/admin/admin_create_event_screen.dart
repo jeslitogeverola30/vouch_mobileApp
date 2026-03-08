@@ -962,7 +962,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             onChanged: (value) {
               setState(() => _isObligatory = value);
             },
-            activeColor: _gold,
+            activeThumbColor: _gold,
             inactiveThumbColor: Colors.white,
             inactiveTrackColor: Colors.grey.shade300,
           ),
@@ -990,7 +990,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               ),
             ),
             const Spacer(),
-            if (trailing != null) trailing,
+            ?trailing,
           ],
         ),
         const SizedBox(height: 8),

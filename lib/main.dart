@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'core/config/app_router.dart';
 import 'core/config/app_strings.dart';
@@ -12,11 +15,50 @@ final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await SupabaseClientService.initialize();
-  await LocalNotificationService.instance.initialize();
+  await dotenv.load(fileName: '.env');
+
+  await SupabaseClientService.initialize(
+    supabaseUrl: _requiredEnv('SUPABASE_URL'),
+    supabaseAnonKey: _requiredEnv('SUPABASE_ANON_KEY'),
+  );
+
   LocalNotificationService.instance.attachNavigatorKey(appNavigatorKey);
+  unawaited(_initializeNotifications());
 
   runApp(const VouchMobileApp());
+}
+
+Future<void> _initializeNotifications() async {
+  try {
+    await LocalNotificationService.instance.initialize();
+  } catch (_) {}
+}
+
+String _requiredEnv(String key) {
+  final rawValue = dotenv.env[key];
+  if (rawValue == null) {
+    throw Exception('Missing $key in .env file.');
+  }
+
+  var value = rawValue.trim();
+  if (value.isEmpty) {
+    throw Exception('Missing $key in .env file.');
+  }
+
+  final wrappedInSingleQuotes =
+      value.length >= 2 && value.startsWith("'") && value.endsWith("'");
+  final wrappedInDoubleQuotes =
+      value.length >= 2 && value.startsWith('"') && value.endsWith('"');
+
+  if (wrappedInSingleQuotes || wrappedInDoubleQuotes) {
+    value = value.substring(1, value.length - 1).trim();
+  }
+
+  if (value.isEmpty) {
+    throw Exception('Missing $key in .env file.');
+  }
+
+  return value;
 }
 
 class VouchMobileApp extends StatelessWidget {
@@ -59,7 +101,9 @@ class _StartupGateState extends State<_StartupGate> {
     }
 
     try {
-      final role = await SupabaseAuthService.determineUserRole();
+      final role = await SupabaseAuthService.determineUserRole().timeout(
+        const Duration(seconds: 8),
+      );
       if (!mounted) return;
 
       if (role == 'admin') {
@@ -69,7 +113,10 @@ class _StartupGateState extends State<_StartupGate> {
 
       _goTo(AppRouter.studentHome);
     } catch (_) {
-      await SupabaseAuthService.signOut();
+      try {
+        await SupabaseAuthService.signOut();
+      } catch (_) {}
+
       if (!mounted) return;
       _goTo(AppRouter.login);
     }

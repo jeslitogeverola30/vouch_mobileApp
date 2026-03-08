@@ -1,25 +1,25 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseClientService {
   SupabaseClientService._();
 
-  static Future<void> initialize({String envFile = '.env'}) async {
-    await dotenv.load(fileName: envFile);
+  static Future<void> initialize({
+    required String supabaseUrl,
+    required String supabaseAnonKey,
+  }) async {
+    final normalizedSupabaseUrl = supabaseUrl.trim();
+    final normalizedSupabaseAnonKey = supabaseAnonKey.trim();
 
-    final supabaseUrl = dotenv.env['SUPABASE_URL'];
-    final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'];
-
-    if (supabaseUrl == null ||
-        supabaseUrl.isEmpty ||
-        supabaseAnonKey == null ||
-        supabaseAnonKey.isEmpty) {
+    if (normalizedSupabaseUrl.isEmpty || normalizedSupabaseAnonKey.isEmpty) {
       throw Exception(
         'Missing SUPABASE_URL or SUPABASE_ANON_KEY in .env file.',
       );
     }
 
-    await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+    await Supabase.initialize(
+      url: normalizedSupabaseUrl,
+      anonKey: normalizedSupabaseAnonKey,
+    );
   }
 
   static SupabaseClient get instance => Supabase.instance.client;
