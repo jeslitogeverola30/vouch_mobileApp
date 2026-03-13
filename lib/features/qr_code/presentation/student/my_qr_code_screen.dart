@@ -239,7 +239,7 @@ class _QRScreenState extends State<QRScreen> {
       if (result['isSuccess'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Verification Card saved to Gallery!'),
+            content: Text('Verification Card saved to Gallery!'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 3),
           ),
