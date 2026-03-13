@@ -1,26 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:ionicons/ionicons.dart';
 
-class StudentEventSearchDelegate extends SearchDelegate<Map<String, String>?> {
-  final List<Map<String, String>> events;
+import '../../../core/data/local/database_helper.dart';
+import '../../events/data/event_query_service.dart';
+import '../../events/domain/event_date_time_formatters.dart';
+import '../../events/presentation/student/student_event_details_screen.dart';
 
-  StudentEventSearchDelegate({required this.events});
+class StudentEventSearchDelegate extends SearchDelegate<void> {
+  List<Map<String, dynamic>> _allEvents = [];
+  bool _isLoading = true;
+  bool _hasFetched = false;
 
-  List<Map<String, String>> _filteredEvents() {
+  StudentEventSearchDelegate() {
+    _fetchEvents();
+  }
+
+  Future<void> _fetchEvents() async {
+    try {
+      final events = await EventQueryService.fetchEvents();
+      _allEvents = events;
+    } catch (_) {
+      _allEvents = [];
+    } finally {
+      _isLoading = false;
+      _hasFetched = true;
+    }
+  }
+
+  List<Map<String, dynamic>> _filteredEvents() {
     if (query.trim().isEmpty) {
-      return events;
+      return _allEvents;
     }
 
     final lowerQuery = query.trim().toLowerCase();
 
-    return events.where((event) {
-      final name = (event['name'] ?? '').toLowerCase();
-      final date = (event['date'] ?? '').toLowerCase();
-      final description = (event['description'] ?? '').toLowerCase();
+    return _allEvents.where((event) {
+      final name = (event['name'] as String? ?? '').toLowerCase();
+      final date = (event['date'] as String? ?? '').toLowerCase();
+      final description = (event['description'] as String? ?? '').toLowerCase();
+      final shortDescription =
+          (event['shortDescription'] as String? ?? '').toLowerCase();
 
       return name.contains(lowerQuery) ||
           date.contains(lowerQuery) ||
-          description.contains(lowerQuery);
+          description.contains(lowerQuery) ||
+          shortDescription.contains(lowerQuery);
     }).toList();
   }
 
@@ -74,17 +98,30 @@ class StudentEventSearchDelegate extends SearchDelegate<Map<String, String>?> {
 
   @override
   Widget buildResults(BuildContext context) {
-    return _buildEventList(context, _filteredEvents());
+    return _buildBody(context);
   }
 
   @override
   Widget buildSuggestions(BuildContext context) {
-    return _buildEventList(context, _filteredEvents(), isSuggestion: true);
+    return _buildBody(context, isSuggestion: true);
+  }
+
+  Widget _buildBody(BuildContext context, {bool isSuggestion = false}) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return StatefulBuilder(
+      builder: (context, setState) {
+        final filtered = _filteredEvents();
+        return _buildEventList(context, filtered, isSuggestion: isSuggestion);
+      },
+    );
   }
 
   Widget _buildEventList(
     BuildContext context,
-    List<Map<String, String>> filteredEvents, {
+    List<Map<String, dynamic>> filteredEvents, {
     bool isSuggestion = false,
   }) {
     if (filteredEvents.isEmpty) {
@@ -130,7 +167,7 @@ class StudentEventSearchDelegate extends SearchDelegate<Map<String, String>?> {
           const Padding(
             padding: EdgeInsets.only(bottom: 10),
             child: Text(
-              "Today's Event",
+              "Events",
               style: TextStyle(
                 color: Color(0xFF003DA5),
                 fontSize: 18,
@@ -139,15 +176,45 @@ class StudentEventSearchDelegate extends SearchDelegate<Map<String, String>?> {
             ),
           ),
         ...filteredEvents.map((event) {
-          final imagePath = event['image'] ?? 'assets/images/panaghigalaay.jpg';
-          final timeIn = event['timeIn'] ?? 'Time-in not available';
-          final timeOut = event['timeOut'] ?? 'Time-out not available';
+          final imagePath =
+              event['image'] as String? ?? 'assets/images/event-siglakas.jpg';
+          final timeIn = event['timeIn'] as String? ?? '-';
+          final timeOut = event['timeOut'] as String? ?? '-';
+          final shortDescription =
+              event['shortDescription'] as String? ?? '';
 
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: InkWell(
               borderRadius: BorderRadius.circular(14),
-              onTap: () => close(context, event),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EventDetailsScreen(
+                      eventImage: imagePath,
+                      eventName: event['name'] as String? ?? 'Event',
+                      eventDate:
+                          event['date'] as String? ?? 'Date not available',
+                      eventTime: EventDateTimeFormatters.buildEventTimeText(
+                        timeIn: event['timeIn'] as String?,
+                        timeOut: event['timeOut'] as String?,
+                      ),
+                      location:
+                          event['location'] as String? ?? 'University Campus',
+                      locationSubtitle:
+                          event['locationSubtitle'] as String? ?? '',
+                      shortDescription: shortDescription.isNotEmpty
+                          ? shortDescription
+                          : 'No short description available for this event.',
+                      description: event['description'] as String? ??
+                          'No description available for this event.',
+                      isObligatory:
+                          event['isObligatory'] as bool? ?? false,
+                    ),
+                  ),
+                );
+              },
               child: Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -170,12 +237,8 @@ class StudentEventSearchDelegate extends SearchDelegate<Map<String, String>?> {
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(14),
                       ),
-                      child: Image.asset(
-                        imagePath,
-                        width: double.infinity,
-                        height: 130,
-                        fit: BoxFit.cover,
-                      ),
+                      child: _buildEventImage(imagePath,
+                          width: double.infinity, height: 130),
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
@@ -186,7 +249,7 @@ class StudentEventSearchDelegate extends SearchDelegate<Map<String, String>?> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  event['name'] ?? 'Event',
+                                  event['name'] as String? ?? 'Event',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
@@ -206,17 +269,17 @@ class StudentEventSearchDelegate extends SearchDelegate<Map<String, String>?> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            event['date'] ?? 'Date not available',
+                            event['date'] as String? ?? 'Date not available',
                             style: const TextStyle(
                               color: Colors.black54,
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          if ((event['description'] ?? '').isNotEmpty) ...[
+                          if (shortDescription.isNotEmpty) ...[
                             const SizedBox(height: 5),
                             Text(
-                              event['description']!,
+                              shortDescription,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -257,6 +320,46 @@ class StudentEventSearchDelegate extends SearchDelegate<Map<String, String>?> {
           );
         }),
       ],
+    );
+  }
+
+  Widget _buildEventImage(
+    String imagePath, {
+    required double width,
+    required double height,
+  }) {
+    final isAssetImage = imagePath.startsWith('assets/');
+
+    if (isAssetImage) {
+      return Image.asset(
+        imagePath,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            width: width,
+            height: height,
+            color: const Color(0xFFF5F5F5),
+            child: const Icon(Ionicons.image, color: Color(0xFF666666)),
+          );
+        },
+      );
+    }
+
+    return Image.network(
+      imagePath,
+      width: width,
+      height: height,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          width: width,
+          height: height,
+          color: const Color(0xFFF5F5F5),
+          child: const Icon(Ionicons.image, color: Color(0xFF666666)),
+        );
+      },
     );
   }
 }
