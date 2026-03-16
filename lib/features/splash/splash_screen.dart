@@ -134,15 +134,15 @@ class _SplashScreenState extends State<SplashScreen>
 
   Widget _buildLogo() {
     return Container(
-      width: 150,
-      height: 150,
+      width: 175,
+      height: 175,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white, width: 12),
         color: const Color.fromARGB(255, 255, 255, 255),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Image.asset('assets/logos/vouch_logo.png', fit: BoxFit.cover),
+      child: Image.asset('assets/logos/vouch_logo.png', fit: BoxFit.fill),
     );
   }
 }

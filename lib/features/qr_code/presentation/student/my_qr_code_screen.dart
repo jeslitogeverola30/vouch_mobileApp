@@ -87,49 +87,65 @@ class _QRScreenState extends State<QRScreen> {
     super.dispose();
   }
 
-  Future<void> _loadProfileFromDatabase() async {
-    Map<String, dynamic>? profile;
-
-    try {
-      profile =
-          (await SupabaseProfileRepositoryImpl.instance.getCurrentUserProfile())
-              ?.toMap();
-    } catch (_) {
-      profile = null;
+  void _restartProfileSubscription() {
+    _profileSubscription?.cancel();
+    if (_studentId.isNotEmpty && mounted) {
+      _subscribeToProfileChanges();
+      print('🔄 QR Screen: Restarted profile subscription');
     }
-
-    if (!mounted) return;
-
-    if (profile == null) {
-      setState(() => _isLoadingProfile = false);
-      return;
-    }
-
-    final studentId = (profile['student_id'] as String?)?.trim();
-    final fullName = (profile['full_name'] as String?)?.trim();
-    final faculty = (profile['faculty'] as String?)?.trim();
-    final program = (profile['program'] as String?)?.trim();
-    final avatarUrl = _normalizeAvatarUrl(profile['profile_photo_url']);
-
-    setState(() {
-      _studentId = (studentId != null && studentId.isNotEmpty)
-          ? studentId
-          : _studentId;
-      _fullName = (fullName != null && fullName.isNotEmpty)
-          ? fullName
-          : _fullName;
-      _faculty = (faculty != null && faculty.isNotEmpty) ? faculty : _faculty;
-      _program = (program != null && program.isNotEmpty) ? program : _program;
-      _avatarUrl = avatarUrl;
-      qrData = _generateQRData(
-        studentId: _studentId,
-        fullName: _fullName,
-        faculty: _faculty,
-        program: _program,
-      );
-      _isLoadingProfile = false;
-    });
   }
+
+  Future<void> _loadProfileFromDatabase() async {
+  if (!mounted) return;
+
+  // Show loading state immediately (important for pull-to-refresh)
+  setState(() => _isLoadingProfile = true);
+
+  Map<String, dynamic>? profile;
+
+  try {
+    profile =
+        (await SupabaseProfileRepositoryImpl.instance.getCurrentUserProfile())
+            ?.toMap();
+  } catch (_) {
+    profile = null;
+  }
+
+  if (!mounted) return;
+
+  if (profile == null) {
+    setState(() => _isLoadingProfile = false);
+    return;
+  }
+
+  final studentId = (profile['student_id'] as String?)?.trim();
+  final fullName = (profile['full_name'] as String?)?.trim();
+  final faculty = (profile['faculty'] as String?)?.trim();
+  final program = (profile['program'] as String?)?.trim();
+  final avatarUrl = _normalizeAvatarUrl(profile['profile_photo_url']);
+
+  setState(() {
+    _studentId = (studentId != null && studentId.isNotEmpty)
+        ? studentId
+        : _studentId;
+    _fullName = (fullName != null && fullName.isNotEmpty)
+        ? fullName
+        : _fullName;
+    _faculty = (faculty != null && faculty.isNotEmpty) ? faculty : _faculty;
+    _program = (program != null && program.isNotEmpty) ? program : _program;
+    _avatarUrl = avatarUrl;
+
+    // Always regenerate QR data with latest values
+    qrData = _generateQRData(
+      studentId: _studentId,
+      fullName: _fullName,
+      faculty: _faculty,
+      program: _program,
+    );
+
+    _isLoadingProfile = false;
+  });
+}
 
   String _generateQRData({
     required String studentId,
@@ -164,20 +180,25 @@ class _QRScreenState extends State<QRScreen> {
         .listen((List<Map<String, dynamic>> snapshots) {
           if (snapshots.isNotEmpty && mounted) {
             final newProfile = snapshots.first;
-            setState(() {
-              _avatarUrl = _normalizeAvatarUrl(
-                newProfile['profile_photo_url'] as String?,
-              );
+            final newAvatarUrl = _normalizeAvatarUrl(
+              newProfile['profile_photo_url'] as String?,
+            );
 
-              // Also refresh QR data if any field changed
-              qrData = _generateQRData(
-                studentId: newProfile['student_id'] ?? _studentId,
-                fullName: newProfile['full_name'] ?? _fullName,
-                faculty: newProfile['faculty'] ?? _faculty,
-                program: newProfile['program'] ?? _program,
-              );
-            });
-            print('✅ QR Screen: Profile picture updated automatically');
+            // Only update if the avatar URL actually changed
+            if (newAvatarUrl != _avatarUrl) {
+              setState(() {
+                _avatarUrl = newAvatarUrl;
+
+                // Also refresh QR data if any field changed
+                qrData = _generateQRData(
+                  studentId: newProfile['student_id'] ?? _studentId,
+                  fullName: newProfile['full_name'] ?? _fullName,
+                  faculty: newProfile['faculty'] ?? _faculty,
+                  program: newProfile['program'] ?? _program,
+                );
+              });
+              print('✅ QR Screen: Profile picture updated automatically to: $newAvatarUrl');
+            }
           }
         });
   }
@@ -341,11 +362,19 @@ class _QRScreenState extends State<QRScreen> {
             onSearchTap: () => openGlobalHeaderSearch(context),
           ),
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [_buildQrContentCard()],
+          child: RefreshIndicator(
+            onRefresh: _refreshQRScreen,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(bottom: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildQrContentCard(),
+                  // Add some extra space to ensure scrollability
+                  const SizedBox(height: 50),
+                ],
+              ),
             ),
           ),
         ),
@@ -618,4 +647,35 @@ class _QRScreenState extends State<QRScreen> {
       ),
     );
   }
+ Future<void> _refreshQRScreen() async {
+  if (!mounted) return;
+
+  print('🔄 QR Screen: Starting refresh...');
+
+  // Show loading spinner in the QR area during refresh
+  setState(() {
+    _isLoadingProfile = true;
+  });
+
+  try {
+    // Re-fetch the latest profile (this already updates _studentId, _fullName, _program, _faculty, _avatarUrl and qrData)
+    await _loadProfileFromDatabase();
+
+    // Restart subscription to ensure real-time updates work
+    _restartProfileSubscription();
+
+    print('✅ QR Screen: Refresh completed successfully');
+
+    // Optional: small delay so the user clearly sees the refresh animation finish
+    await Future.delayed(const Duration(milliseconds: 300));
+  } catch (e) {
+    print('❌ QR Screen: Refresh failed: $e');
+    if (mounted) {
+      setState(() => _isLoadingProfile = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to refresh: ${e.toString()}')),
+      );
+    }
+  }
+}
 }
