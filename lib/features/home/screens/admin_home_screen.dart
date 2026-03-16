@@ -10,6 +10,9 @@ import '../../events/domain/event_date_time_formatters.dart';
 import '../../events/presentation/admin/admin_event_details_screen.dart';
 import '../data/admin_home_statistics_service.dart';
 
+import '../../../core/config/app_constants.dart';          // ← your new constants
+import 'package:shared_preferences/shared_preferences.dart';
+
 class AdminHomeScreen extends StatefulWidget {
   final bool showChrome;
 
@@ -28,14 +31,68 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   int _upcomingEventsCount = 0;
 
   List<Map<String, dynamic>> _todayEvents = const [];
-
+  DateTime? _lastRefreshTime;
+  int _dailyRefreshCount = 0;
+  String _currentDay = '';
   @override
   void initState() {
     super.initState();
     _loadTodayEvents();
   }
 
-  Future<void> _refreshHomeScreen() async {
+    Future<void> _refreshHomeScreen() async {
+    final now = DateTime.now();
+    final prefs = await SharedPreferences.getInstance();
+
+    // Load persisted values
+    final lastRefreshStr = prefs.getString('admin_last_refresh_time');
+    if (lastRefreshStr != null) {
+      _lastRefreshTime = DateTime.tryParse(lastRefreshStr);
+    }
+    _dailyRefreshCount = prefs.getInt('admin_daily_refresh_count') ?? 0;
+    _currentDay = prefs.getString('admin_current_day') ?? '';
+
+    // Reset daily count if it's a new day
+    final today = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+    if (_currentDay != today) {
+      _dailyRefreshCount = 0;
+      _currentDay = today;
+    }
+
+    // === 1. Check cooldown ===
+    if (_lastRefreshTime != null) {
+      final timeSinceLast = now.difference(_lastRefreshTime!);
+      if (timeSinceLast < AppConstants.refreshCooldown) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Please wait at least ${AppConstants.refreshCooldown.inMinutes} minute${AppConstants.refreshCooldown.inMinutes > 1 ? 's' : ''} before refreshing again.',
+              ),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    // === 2. Check daily limit ===
+    if (_dailyRefreshCount >= AppConstants.maxDailyRefreshes) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You have reached the maximum of 5 refreshes today. Please try again tomorrow.'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
+
+    // === ALLOW REFRESH ===
     if (mounted) {
       setState(() {
         _isLoadingTodayEvents = true;
@@ -44,6 +101,25 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     }
 
     await _loadTodayEvents();
+
+    // Update tracking
+    _lastRefreshTime = now;
+    _dailyRefreshCount++;
+
+    // Save to device storage
+    await prefs.setString('admin_last_refresh_time', now.toIso8601String());
+    await prefs.setInt('admin_daily_refresh_count', _dailyRefreshCount);
+    await prefs.setString('admin_current_day', today);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Refreshed successfully'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
   }
 
   Future<void> _loadTodayEvents() async {
