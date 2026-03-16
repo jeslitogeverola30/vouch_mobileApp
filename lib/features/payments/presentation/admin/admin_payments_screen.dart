@@ -12,6 +12,8 @@ import 'admin_created_fees_screen.dart';
 import 'admin_create_fee_screen.dart';
 import 'admin_edit_receiver_screen.dart';
 
+import '../../../../core/config/app_constants.dart';          // ← your constants
+import 'package:shared_preferences/shared_preferences.dart';
 class AdminPaymentsScreen extends StatefulWidget {
   const AdminPaymentsScreen({super.key});
 
@@ -30,6 +32,9 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
   bool _isLoadingSubmissions = false;
   bool _isApplyingSubmissionDecision = false;
   String? _submissionErrorMessage;
+    DateTime? _lastRefreshTime;
+  int _dailyRefreshCount = 0;
+  String _currentDay = '';
 
   @override
   void initState() {
@@ -750,8 +755,86 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
     );
   }
 
-  Future<void> _refreshScreen() async {
-    await Future.wait<void>([_loadReceiverReference(), _loadSubmissions()]);
+   Future<void> _refreshScreen() async {
+    final now = DateTime.now();
+    final prefs = await SharedPreferences.getInstance();
+
+    // Load persisted values
+    final lastRefreshStr = prefs.getString('admin_payments_last_refresh_time');
+    if (lastRefreshStr != null) {
+      _lastRefreshTime = DateTime.tryParse(lastRefreshStr);
+    }
+    _dailyRefreshCount = prefs.getInt('admin_payments_daily_refresh_count') ?? 0;
+    _currentDay = prefs.getString('admin_payments_current_day') ?? '';
+
+    // Reset daily count if it's a new day
+    final today = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+    if (_currentDay != today) {
+      _dailyRefreshCount = 0;
+      _currentDay = today;
+    }
+
+    // === 1. Check cooldown (1 minute) ===
+    if (_lastRefreshTime != null) {
+      final timeSinceLast = now.difference(_lastRefreshTime!);
+      if (timeSinceLast < AppConstants.refreshCooldown) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Please wait at least ${AppConstants.refreshCooldown.inMinutes} minute${AppConstants.refreshCooldown.inMinutes > 1 ? 's' : ''} before refreshing again.',
+              ),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    // === 2. Check daily limit (max 5) ===
+    if (_dailyRefreshCount >= AppConstants.maxDailyRefreshes) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You have reached the maximum of 5 refreshes today. Please try again tomorrow.'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
+
+    // === ALLOW REFRESH ===
+    if (mounted) {
+      setState(() => _isLoadingSubmissions = true);
+    }
+
+    await Future.wait<void>([
+      _loadReceiverReference(),
+      _loadSubmissions(),
+    ]);
+
+    // Update tracking
+    _lastRefreshTime = now;
+    _dailyRefreshCount++;
+
+    // Save to device storage
+    await prefs.setString('admin_payments_last_refresh_time', now.toIso8601String());
+    await prefs.setInt('admin_payments_daily_refresh_count', _dailyRefreshCount);
+    await prefs.setString('admin_payments_current_day', today);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Refreshed successfully'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
   }
 
   @override
