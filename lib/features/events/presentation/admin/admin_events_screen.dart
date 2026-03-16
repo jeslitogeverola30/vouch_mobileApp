@@ -188,37 +188,37 @@ class _EventsScreenState extends State<AdminEventsScreen>
         ),
         const SizedBox(height: 10),
         Expanded(
-          child: RefreshIndicator(
-            onRefresh: _refreshEvents,
-            child: FutureBuilder<List<Map<String, dynamic>>>(
-              future: _eventsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            future: _eventsFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-                if (snapshot.hasError) {
-                  return _buildNoEventsState(
+              if (snapshot.hasError) {
+                return RefreshIndicator(
+                  onRefresh: _refreshEvents,
+                  child: _buildNoEventsState(
                     'Failed to load events. Pull to refresh this screen.',
-                  );
-                }
-
-                final events = snapshot.data ?? const <Map<String, dynamic>>[];
-                final todayEvents = EventQueryService.todayEvents(events);
-                final upcomingEvents = EventQueryService.upcomingEvents(events);
-                final pastEvents = EventQueryService.pastEvents(events);
-
-                return TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildTodayTab(todayEvents),
-                    _buildUpcomingTab(upcomingEvents),
-                    _buildPastTab(pastEvents),
-                    _buildRateTab(),
-                  ],
+                  ),
                 );
-              },
-            ),
+              }
+
+              final events = snapshot.data ?? const <Map<String, dynamic>>[];
+              final todayEvents = EventQueryService.todayEvents(events);
+              final upcomingEvents = EventQueryService.upcomingEvents(events);
+              final pastEvents = EventQueryService.pastEvents(events);
+
+              return TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildTodayTab(todayEvents),
+                  _buildUpcomingTab(upcomingEvents),
+                  _buildPastTab(pastEvents),
+                  _buildRateTab(),
+                ],
+              );
+            },
           ),
         ),
       ],
@@ -239,32 +239,44 @@ class _EventsScreenState extends State<AdminEventsScreen>
 
   Widget _buildTodayTab(List<Map<String, dynamic>> todayEvents) {
     if (todayEvents.isEmpty) {
-      return _buildNoEventsState('No events today');
+      return RefreshIndicator(
+        onRefresh: _refreshEvents,
+        child: _buildNoEventsState('No events today'),
+      );
     }
 
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: todayEvents
-            .map((event) => _buildUpcomingEventCard(event, isTodayEvent: true))
-            .toList(),
+    return RefreshIndicator(
+      onRefresh: _refreshEvents,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: todayEvents
+              .map((event) => _buildUpcomingEventCard(event, isTodayEvent: true))
+              .toList(),
+        ),
       ),
     );
   }
 
   Widget _buildUpcomingTab(List<Map<String, dynamic>> upcomingEvents) {
     if (upcomingEvents.isEmpty) {
-      return _buildNoEventsState('No upcoming events');
+      return RefreshIndicator(
+        onRefresh: _refreshEvents,
+        child: _buildNoEventsState('No upcoming events'),
+      );
     }
 
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: upcomingEvents
-            .map((event) => _buildUpcomingEventCard(event, isTodayEvent: false))
-            .toList(),
+    return RefreshIndicator(
+      onRefresh: _refreshEvents,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: upcomingEvents
+              .map((event) => _buildUpcomingEventCard(event, isTodayEvent: false))
+              .toList(),
+        ),
       ),
     );
   }
@@ -507,16 +519,22 @@ class _EventsScreenState extends State<AdminEventsScreen>
 
   Widget _buildPastTab(List<Map<String, dynamic>> pastEvents) {
     if (pastEvents.isEmpty) {
-      return _buildNoEventsState('No past events yet');
+      return RefreshIndicator(
+        onRefresh: _refreshEvents,
+        child: _buildNoEventsState('No past events yet'),
+      );
     }
 
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: pastEvents
-            .map((event) => _buildPastEventCard(event))
-            .toList(),
+    return RefreshIndicator(
+      onRefresh: _refreshEvents,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: pastEvents
+              .map((event) => _buildPastEventCard(event))
+              .toList(),
+        ),
       ),
     );
   }
@@ -752,32 +770,35 @@ class _EventsScreenState extends State<AdminEventsScreen>
   }
 
   Widget _buildRateTab() {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _rateEventsFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    return RefreshIndicator(
+      onRefresh: _refreshEvents,
+      child: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _rateEventsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-        if (snapshot.hasError) {
-          return _buildNoEventsState('Failed to load event ratings.');
-        }
+          if (snapshot.hasError) {
+            return _buildNoEventsState('Failed to load event ratings.');
+          }
 
-        final rateEvents = snapshot.data ?? const <Map<String, dynamic>>[];
-        if (rateEvents.isEmpty) {
-          return _buildNoEventsState('No event ratings available yet');
-        }
+          final rateEvents = snapshot.data ?? const <Map<String, dynamic>>[];
+          if (rateEvents.isEmpty) {
+            return _buildNoEventsState('No event ratings available yet');
+          }
 
-        return SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: rateEvents
-                .map((event) => _buildRateEventCard(event))
-                .toList(),
-          ),
-        );
-      },
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: rateEvents
+                  .map((event) => _buildRateEventCard(event))
+                  .toList(),
+            ),
+          );
+        },
+      ),
     );
   }
 
