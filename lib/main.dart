@@ -8,7 +8,6 @@ import 'core/config/app_strings.dart';
 import 'core/services/local_notification_service.dart';
 import 'core/services/supabase_client.dart';
 import 'core/theme/app_theme.dart';
-import 'features/auth/data/supabase_auth_service.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -71,64 +70,9 @@ class VouchMobileApp extends StatelessWidget {
       title: AppStrings.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
-      home: const _StartupGate(),
+      initialRoute: AppRouter.splash,
       onGenerateRoute: AppRouter.onGenerateRoute,
     );
-  }
-}
-
-class _StartupGate extends StatefulWidget {
-  const _StartupGate();
-
-  @override
-  State<_StartupGate> createState() => _StartupGateState();
-}
-
-class _StartupGateState extends State<_StartupGate> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _routeUser());
-  }
-
-  Future<void> _routeUser() async {
-    if (!mounted) return;
-
-    final hasSession = SupabaseAuthService.currentUser != null;
-    if (!hasSession) {
-      _goTo(AppRouter.login);
-      return;
-    }
-
-    try {
-      final role = await SupabaseAuthService.determineUserRole().timeout(
-        const Duration(seconds: 8),
-      );
-      if (!mounted) return;
-
-      if (role == 'admin') {
-        _goTo(AppRouter.adminHome);
-        return;
-      }
-
-      _goTo(AppRouter.studentHome);
-    } catch (_) {
-      try {
-        await SupabaseAuthService.signOut();
-      } catch (_) {}
-
-      if (!mounted) return;
-      _goTo(AppRouter.login);
-    }
-  }
-
-  void _goTo(String routeName) {
-    Navigator.of(context).pushNamedAndRemoveUntil(routeName, (route) => false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }
 

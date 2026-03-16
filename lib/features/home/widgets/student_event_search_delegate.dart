@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ionicons/ionicons.dart';
 
-import '../../../core/data/local/database_helper.dart';
 import '../../events/data/event_query_service.dart';
 import '../../events/domain/event_date_time_formatters.dart';
 import '../../events/presentation/student/student_event_details_screen.dart';
