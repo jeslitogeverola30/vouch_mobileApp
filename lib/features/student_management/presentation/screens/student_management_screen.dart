@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:ionicons/ionicons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/config/app_constants.dart';
+
 import '../../data/academic_term_service.dart';
 import '../../data/supabase_student_management_impl.dart';
 import '../../../auth/data/supabase_auth_service.dart';
@@ -47,6 +49,12 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
   Set<String> _clearedStudentIds = <String>{};
   List<AcademicTermOption> _academicTerms = const <AcademicTermOption>[];
   AcademicTermOption? _activeAcademicTerm;
+
+  // ==================== REFRESH CONTROL ====================
+  DateTime? _lastRefreshTime;
+  int _dailyRefreshCount = 0;
+  DateTime? _lastRefreshDate;
+  // =======================================================
 
   static const List<String> _semesterOptions = <String>[
     '1st Semester',
@@ -787,6 +795,60 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
     _searchController.dispose();
     super.dispose();
   }
+
+  // ==================== NEW: REFRESH CONTROL HELPERS ====================
+  void _resetDailyCountIfNeeded() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    if (_lastRefreshDate == null || _lastRefreshDate != today) {
+      _dailyRefreshCount = 0;
+      _lastRefreshDate = today;
+    }
+  }
+
+  /// Safe refresh that respects cooldown + daily limit (only for pull-to-refresh)
+  Future<void> _attemptRefresh() async {
+    _resetDailyCountIfNeeded();
+
+    if (_dailyRefreshCount >= AppConstants.maxDailyRefreshes) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'You have reached the maximum number of manual refreshes for today (5). Try again tomorrow.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    final now = DateTime.now();
+    if (_lastRefreshTime != null) {
+      final elapsed = now.difference(_lastRefreshTime!);
+      if (elapsed < AppConstants.refreshCooldown) {
+        final secondsLeft = (AppConstants.refreshCooldown.inSeconds - elapsed.inSeconds)
+            .clamp(1, 60);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Please wait $secondsLeft seconds before refreshing again.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    _lastRefreshTime = now;
+    _dailyRefreshCount++;
+
+    await _refreshScreen();
+  }
+  // =====================================================================
 
   Future<void> _refreshScreen() async {
     await Future.wait<void>([_loadStudents(), _loadAcademicTerms()]);
@@ -1800,7 +1862,7 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
               ),
             ),
             RefreshIndicator(
-              onRefresh: _refreshScreen,
+              onRefresh: _attemptRefresh, // ← controlled
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.only(bottom: 24),

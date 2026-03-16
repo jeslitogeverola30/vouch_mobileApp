@@ -9,13 +9,14 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // ← NEW for real-time
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/utils/global_header_search.dart';
 import '../../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../../core/widgets/app_main_header.dart';
 import '../../../profile/data/supabase_profile_repository_impl.dart';
 import '../../../../core/config/app_router.dart';
+import '../../../../core/config/app_constants.dart';          // ← NEW IMPORT
 
 const Color royalBlue = Color(0xFF003DA5);
 const Color gold = Color(0xFFFFC107);
@@ -46,7 +47,7 @@ class QRScreen extends StatefulWidget {
 }
 
 class _QRScreenState extends State<QRScreen> {
-  final GlobalKey _cardBoundaryKey = GlobalKey(); // For full card capture
+  final GlobalKey _cardBoundaryKey = GlobalKey();
   bool _isCapturing = false;
   late StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
 
@@ -58,6 +59,12 @@ class _QRScreenState extends State<QRScreen> {
   String? _avatarUrl;
   bool _isLoadingProfile = true;
   int _selectedNavIndex = 2;
+
+  // ==================== REFRESH CONTROL ====================
+  DateTime? _lastRefreshTime;
+  int _dailyRefreshCount = 0;
+  DateTime? _lastRefreshDate;
+  // =======================================================
 
   @override
   void initState() {
@@ -73,7 +80,6 @@ class _QRScreenState extends State<QRScreen> {
       program: _program,
     );
 
-    // Load once + subscribe to real-time updates
     _loadProfileFromDatabase().then((_) {
       if (_studentId.isNotEmpty && mounted) {
         _subscribeToProfileChanges();
@@ -98,7 +104,6 @@ class _QRScreenState extends State<QRScreen> {
   Future<void> _loadProfileFromDatabase() async {
     if (!mounted) return;
 
-    // Show loading state immediately (important for pull-to-refresh)
     setState(() => _isLoadingProfile = true);
 
     Map<String, dynamic>? profile;
@@ -135,7 +140,6 @@ class _QRScreenState extends State<QRScreen> {
       _program = (program != null && program.isNotEmpty) ? program : _program;
       _avatarUrl = avatarUrl;
 
-      // Always regenerate QR data with latest values
       qrData = _generateQRData(
         studentId: _studentId,
         fullName: _fullName,
@@ -165,7 +169,6 @@ class _QRScreenState extends State<QRScreen> {
     if (value == null || value.trim().isEmpty) return null;
 
     final cleanUrl = value.trim();
-
     final cacheBuster = DateTime.now().millisecondsSinceEpoch;
     final separator = cleanUrl.contains('?') ? '&' : '?';
 
@@ -184,12 +187,9 @@ class _QRScreenState extends State<QRScreen> {
               newProfile['profile_photo_url'] as String?,
             );
 
-            // Only update if the avatar URL actually changed
             if (newAvatarUrl != _avatarUrl) {
               setState(() {
                 _avatarUrl = newAvatarUrl;
-
-                // Also refresh QR data if any field changed
                 qrData = _generateQRData(
                   studentId: newProfile['student_id'] ?? _studentId,
                   fullName: newProfile['full_name'] ?? _fullName,
@@ -197,9 +197,6 @@ class _QRScreenState extends State<QRScreen> {
                   program: newProfile['program'] ?? _program,
                 );
               });
-              print(
-                '✅ QR Screen: Profile picture updated automatically to: $newAvatarUrl',
-              );
             }
           }
         });
@@ -214,7 +211,6 @@ class _QRScreenState extends State<QRScreen> {
     }
 
     try {
-      // Hide button for clean capture
       setState(() => _isCapturing = true);
       await Future.delayed(const Duration(milliseconds: 100));
 
@@ -224,22 +220,19 @@ class _QRScreenState extends State<QRScreen> {
 
       if (boundary == null) {
         setState(() => _isCapturing = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Unable to capture card')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Unable to capture card')));
         return;
       }
 
       final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-      final ByteData? byteData = await image.toByteData(
-        format: ui.ImageByteFormat.png,
-      );
+      final ByteData? byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
 
       if (byteData == null) {
         setState(() => _isCapturing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to process card image')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Failed to process card image')));
         return;
       }
 
@@ -248,15 +241,13 @@ class _QRScreenState extends State<QRScreen> {
       final String fileName =
           'Vouch_VerificationCard_${_studentId}_${DateTime.now().millisecondsSinceEpoch}.png';
 
-      final Map<dynamic, dynamic> result =
-          await ImageGallerySaverPlus.saveImage(
-            pngBytes,
-            quality: 100,
-            name: fileName,
-          );
+      final Map<dynamic, dynamic> result = await ImageGallerySaverPlus.saveImage(
+        pngBytes,
+        quality: 100,
+        name: fileName,
+      );
 
       if (!mounted) return;
-
       setState(() => _isCapturing = false);
 
       if (result['isSuccess'] == true) {
@@ -268,18 +259,70 @@ class _QRScreenState extends State<QRScreen> {
           ),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to save to gallery')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Failed to save to gallery')));
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isCapturing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving card: ${e.toString()}')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error saving card: ${e.toString()}')));
     }
   }
+
+  // ==================== NEW: REFRESH CONTROL HELPERS ====================
+  void _resetDailyCountIfNeeded() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    if (_lastRefreshDate == null || _lastRefreshDate != today) {
+      _dailyRefreshCount = 0;
+      _lastRefreshDate = today;
+    }
+  }
+
+  /// Safe refresh that respects cooldown + daily limit (only for pull-to-refresh)
+  Future<void> _attemptRefresh() async {
+    _resetDailyCountIfNeeded();
+
+    if (_dailyRefreshCount >= AppConstants.maxDailyRefreshes) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'You have reached the maximum number of manual refreshes for today (5). Try again tomorrow.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    final now = DateTime.now();
+    if (_lastRefreshTime != null) {
+      final elapsed = now.difference(_lastRefreshTime!);
+      if (elapsed < AppConstants.refreshCooldown) {
+        final secondsLeft = (AppConstants.refreshCooldown.inSeconds - elapsed.inSeconds)
+            .clamp(1, 60);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Please wait $secondsLeft seconds before refreshing again.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    _lastRefreshTime = now;
+    _dailyRefreshCount++;
+
+    await _refreshQRScreen();
+  }
+  // =====================================================================
 
   @override
   Widget build(BuildContext context) {
@@ -327,10 +370,7 @@ class _QRScreenState extends State<QRScreen> {
                   if (index == _selectedNavIndex) return;
 
                   if (index == 0) {
-                    Navigator.pushReplacementNamed(
-                      context,
-                      AppRouter.studentHome,
-                    );
+                    Navigator.pushReplacementNamed(context, AppRouter.studentHome);
                     return;
                   }
                   if (index == 1) {
@@ -365,7 +405,7 @@ class _QRScreenState extends State<QRScreen> {
           ),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: _refreshQRScreen,
+            onRefresh: _attemptRefresh, // ← controlled
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.only(bottom: 20),
@@ -373,7 +413,6 @@ class _QRScreenState extends State<QRScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildQrContentCard(),
-                  // Add some extra space to ensure scrollability
                   const SizedBox(height: 50),
                 ],
               ),
@@ -450,10 +489,7 @@ class _QRScreenState extends State<QRScreen> {
                   if (!_isCapturing)
                     IconButton(
                       onPressed: _downloadVerificationCard,
-                      icon: const Icon(
-                        Ionicons.download_outline,
-                        color: royalBlue,
-                      ),
+                      icon: const Icon(Ionicons.download_outline, color: royalBlue),
                       tooltip: 'Save Verification Card',
                     ),
                 ],
@@ -580,9 +616,7 @@ class _QRScreenState extends State<QRScreen> {
                               width: 220,
                               height: 220,
                               color: lightGray,
-                              child: const Center(
-                                child: Text('Error generating QR'),
-                              ),
+                              child: const Center(child: Text('Error generating QR')),
                             );
                           },
                         ),
@@ -655,29 +689,20 @@ class _QRScreenState extends State<QRScreen> {
 
     print('🔄 QR Screen: Starting refresh...');
 
-    // Show loading spinner in the QR area during refresh
-    setState(() {
-      _isLoadingProfile = true;
-    });
+    setState(() => _isLoadingProfile = true);
 
     try {
-      // Re-fetch the latest profile (this already updates _studentId, _fullName, _program, _faculty, _avatarUrl and qrData)
       await _loadProfileFromDatabase();
-
-      // Restart subscription to ensure real-time updates work
       _restartProfileSubscription();
 
       print('✅ QR Screen: Refresh completed successfully');
-
-      // Optional: small delay so the user clearly sees the refresh animation finish
       await Future.delayed(const Duration(milliseconds: 300));
     } catch (e) {
       print('❌ QR Screen: Refresh failed: $e');
       if (mounted) {
         setState(() => _isLoadingProfile = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to refresh: ${e.toString()}')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed to refresh: ${e.toString()}')));
       }
     }
   }

@@ -6,6 +6,8 @@ import '../../../../core/widgets/admin_bottom_navigation_bar.dart';
 import '../../../../core/utils/global_header_search.dart';
 import '../../../../core/widgets/app_main_header.dart';
 import '../../../../core/config/app_router.dart';
+import '../../../../core/config/app_constants.dart';          // ← NEW IMPORT
+
 import '../../data/event_rating_service.dart';
 import '../../data/event_query_service.dart';
 import '../../domain/event_date_time_formatters.dart';
@@ -23,7 +25,7 @@ class AdminEventsScreen extends StatefulWidget {
   final bool showChrome;
   final int initialTabIndex;
   final void Function(BuildContext context, Map<String, dynamic> event)?
-  onViewDetailsTap;
+      onViewDetailsTap;
 
   const AdminEventsScreen({
     super.key,
@@ -42,6 +44,12 @@ class _EventsScreenState extends State<AdminEventsScreen>
   late Future<List<Map<String, dynamic>>> _eventsFuture;
   late Future<List<Map<String, dynamic>>> _rateEventsFuture;
   final int _selectedNavIndex = 2;
+
+  // ==================== REFRESH CONTROL ====================
+  DateTime? _lastRefreshTime;
+  int _dailyRefreshCount = 0;
+  DateTime? _lastRefreshDate;
+  // =======================================================
 
   @override
   void initState() {
@@ -71,6 +79,63 @@ class _EventsScreenState extends State<AdminEventsScreen>
       rateEventsFuture,
     ]);
   }
+
+  // ==================== NEW: REFRESH CONTROL HELPERS ====================
+  void _resetDailyCountIfNeeded() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    if (_lastRefreshDate == null || _lastRefreshDate != today) {
+      _dailyRefreshCount = 0;
+      _lastRefreshDate = today;
+    }
+  }
+
+  /// Safe refresh that respects cooldown + daily limit (only for pull-to-refresh)
+  Future<void> _attemptRefresh() async {
+    _resetDailyCountIfNeeded();
+
+    // Daily limit check
+    if (_dailyRefreshCount >= AppConstants.maxDailyRefreshes) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'You have reached the maximum number of manual refreshes for today (5). Try again tomorrow.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Cooldown check
+    final now = DateTime.now();
+    if (_lastRefreshTime != null) {
+      final elapsed = now.difference(_lastRefreshTime!);
+      if (elapsed < AppConstants.refreshCooldown) {
+        final secondsLeft = (AppConstants.refreshCooldown.inSeconds - elapsed.inSeconds)
+            .clamp(1, 60);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Please wait $secondsLeft seconds before refreshing again.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    // Allowed to refresh
+    _lastRefreshTime = now;
+    _dailyRefreshCount++;
+
+    await _refreshEvents();
+  }
+  // =====================================================================
 
   @override
   void dispose() {
@@ -126,7 +191,7 @@ class _EventsScreenState extends State<AdminEventsScreen>
             );
 
             if (created == true && mounted) {
-              _refreshEvents();
+              _refreshEvents(); // automatic refresh (no limit)
             }
           },
           backgroundColor: const Color(0xFF003DA5),
@@ -197,7 +262,7 @@ class _EventsScreenState extends State<AdminEventsScreen>
 
               if (snapshot.hasError) {
                 return RefreshIndicator(
-                  onRefresh: _refreshEvents,
+                  onRefresh: _attemptRefresh, // ← controlled
                   child: _buildNoEventsState(
                     'Failed to load events. Pull to refresh this screen.',
                   ),
@@ -240,19 +305,21 @@ class _EventsScreenState extends State<AdminEventsScreen>
   Widget _buildTodayTab(List<Map<String, dynamic>> todayEvents) {
     if (todayEvents.isEmpty) {
       return RefreshIndicator(
-        onRefresh: _refreshEvents,
+        onRefresh: _attemptRefresh, // ← controlled
         child: _buildNoEventsState('No events today'),
       );
     }
 
     return RefreshIndicator(
-      onRefresh: _refreshEvents,
+      onRefresh: _attemptRefresh, // ← controlled
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         child: Column(
           children: todayEvents
-              .map((event) => _buildUpcomingEventCard(event, isTodayEvent: true))
+              .map(
+                (event) => _buildUpcomingEventCard(event, isTodayEvent: true),
+              )
               .toList(),
         ),
       ),
@@ -262,24 +329,28 @@ class _EventsScreenState extends State<AdminEventsScreen>
   Widget _buildUpcomingTab(List<Map<String, dynamic>> upcomingEvents) {
     if (upcomingEvents.isEmpty) {
       return RefreshIndicator(
-        onRefresh: _refreshEvents,
+        onRefresh: _attemptRefresh, // ← controlled
         child: _buildNoEventsState('No upcoming events'),
       );
     }
 
     return RefreshIndicator(
-      onRefresh: _refreshEvents,
+      onRefresh: _attemptRefresh, // ← controlled
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         child: Column(
           children: upcomingEvents
-              .map((event) => _buildUpcomingEventCard(event, isTodayEvent: false))
+              .map(
+                (event) => _buildUpcomingEventCard(event, isTodayEvent: false),
+              )
               .toList(),
         ),
       ),
     );
   }
+
+  // ... (all other methods remain exactly the same until _buildPastTab)
 
   Widget _buildUpcomingEventCard(
     Map<String, dynamic> event, {
@@ -459,20 +530,17 @@ class _EventsScreenState extends State<AdminEventsScreen>
                         MaterialPageRoute(
                           builder: (_) => AdminEventDetailsScreen(
                             eventId: _readInt(event['id']),
-                            eventImage:
-                                event['image'] as String? ??
+                            eventImage: event['image'] as String? ??
                                 'assets/images/event-siglakas.jpg',
                             eventName: event['name'] as String? ?? 'Event',
-                            eventDate:
-                                event['date'] as String? ??
+                            eventDate: event['date'] as String? ??
                                 'Date not available',
                             eventTime:
                                 EventDateTimeFormatters.buildEventTimeText(
-                                  timeIn: event['timeIn'] as String?,
-                                  timeOut: event['timeOut'] as String?,
-                                ),
-                            location:
-                                event['location'] as String? ??
+                              timeIn: event['timeIn'] as String?,
+                              timeOut: event['timeOut'] as String?,
+                            ),
+                            location: event['location'] as String? ??
                                 'University Campus',
                             locationSubtitle:
                                 event['locationSubtitle'] as String? ?? '',
@@ -488,10 +556,10 @@ class _EventsScreenState extends State<AdminEventsScreen>
                                 event['timeOutEndRaw'] as String? ?? '',
                             shortDescription:
                                 event['shortDescription'] as String? ??
-                                'No short description available for this event.',
+                                    'No short description available for this event.',
                             description:
                                 event['description'] as String? ??
-                                'No description available for this event.',
+                                    'No description available for this event.',
                             isObligatory:
                                 event['isObligatory'] as bool? ?? false,
                             isTodayEvent: isTodayEvent,
@@ -500,7 +568,7 @@ class _EventsScreenState extends State<AdminEventsScreen>
                       );
 
                       if (changed == true && mounted) {
-                        _refreshEvents();
+                        _refreshEvents(); // automatic refresh (no limit)
                       }
                     },
                     child: const Text(
@@ -520,13 +588,13 @@ class _EventsScreenState extends State<AdminEventsScreen>
   Widget _buildPastTab(List<Map<String, dynamic>> pastEvents) {
     if (pastEvents.isEmpty) {
       return RefreshIndicator(
-        onRefresh: _refreshEvents,
+        onRefresh: _attemptRefresh, // ← controlled
         child: _buildNoEventsState('No past events yet'),
       );
     }
 
     return RefreshIndicator(
-      onRefresh: _refreshEvents,
+      onRefresh: _attemptRefresh, // ← controlled
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
@@ -771,7 +839,7 @@ class _EventsScreenState extends State<AdminEventsScreen>
 
   Widget _buildRateTab() {
     return RefreshIndicator(
-      onRefresh: _refreshEvents,
+      onRefresh: _attemptRefresh, // ← controlled
       child: FutureBuilder<List<Map<String, dynamic>>>(
         future: _rateEventsFuture,
         builder: (context, snapshot) {
@@ -927,32 +995,20 @@ class _EventsScreenState extends State<AdminEventsScreen>
   }
 
   double _readDouble(dynamic value) {
-    if (value is double) {
-      return value;
-    }
-
-    if (value is num) {
-      return value.toDouble();
-    }
-
-    if (value is String) {
-      return double.tryParse(value.trim()) ?? 0;
-    }
-
+    if (value is double) return value;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value.trim()) ?? 0;
     return 0;
   }
 
   Map<String, int> _readBreakdown(dynamic value) {
     final empty = const <String, int>{'5': 0, '4': 0, '3': 0, '2': 0, '1': 0};
-    if (value is! Map) {
-      return empty;
-    }
+    if (value is! Map) return empty;
 
     final output = <String, int>{...empty};
     for (final stars in output.keys.toList()) {
       output[stars] = _readInt(value[stars]) ?? 0;
     }
-
     return output;
   }
 
@@ -1109,18 +1165,9 @@ class _EventsScreenState extends State<AdminEventsScreen>
   }
 
   int? _readInt(dynamic value) {
-    if (value is int) {
-      return value;
-    }
-
-    if (value is num) {
-      return value.toInt();
-    }
-
-    if (value is String) {
-      return int.tryParse(value.trim());
-    }
-
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value.trim());
     return null;
   }
 }

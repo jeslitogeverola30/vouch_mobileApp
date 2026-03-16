@@ -11,6 +11,8 @@ import '../../../../core/utils/global_header_search.dart';
 import '../../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../../core/widgets/app_main_header.dart';
 import '../../../../core/config/app_router.dart';
+import '../../../../core/config/app_constants.dart';          // ← NEW IMPORT
+
 import '../../../auth/data/supabase_auth_service.dart';
 import '../../../student_management/data/academic_term_service.dart';
 import '../../data/profile_image_upload_service.dart';
@@ -59,6 +61,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late String _program;
   String _avatarUrl = '';
   AcademicTermOption? _activeAcademicTerm;
+
+  // ==================== REFRESH CONTROL ====================
+  DateTime? _lastRefreshTime;
+  int _dailyRefreshCount = 0;
+  DateTime? _lastRefreshDate;
+  // =======================================================
 
   @override
   void initState() {
@@ -151,6 +159,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     await Future.wait<void>([_loadProfile(), _loadAcademicTerm()]);
   }
+
+  // ==================== NEW: REFRESH CONTROL HELPERS ====================
+  void _resetDailyCountIfNeeded() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    if (_lastRefreshDate == null || _lastRefreshDate != today) {
+      _dailyRefreshCount = 0;
+      _lastRefreshDate = today;
+    }
+  }
+
+  /// Safe refresh that respects cooldown + daily limit (only for pull-to-refresh)
+  Future<void> _attemptRefresh() async {
+    _resetDailyCountIfNeeded();
+
+    if (_dailyRefreshCount >= AppConstants.maxDailyRefreshes) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'You have reached the maximum number of manual refreshes for today (5). Try again tomorrow.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    final now = DateTime.now();
+    if (_lastRefreshTime != null) {
+      final elapsed = now.difference(_lastRefreshTime!);
+      if (elapsed < AppConstants.refreshCooldown) {
+        final secondsLeft = (AppConstants.refreshCooldown.inSeconds - elapsed.inSeconds)
+            .clamp(1, 60);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Please wait $secondsLeft seconds before refreshing again.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    _lastRefreshTime = now;
+    _dailyRefreshCount++;
+
+    await _refreshProfileScreen();
+  }
+  // =====================================================================
 
   Future<void> _showAvatarActions() async {
     final action = await showModalBottomSheet<String>(
@@ -575,7 +637,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: _refreshProfileScreen,
+            onRefresh: _attemptRefresh, // ← controlled
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               child: Column(
@@ -740,6 +802,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                         ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF003DA5),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: const Icon(
+                            Icons.edit,
+                            color: Colors.white,
+                            size: 12,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
