@@ -6,7 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:ionicons/ionicons.dart';
 
 import '../../../../core/config/app_router.dart';
-import '../../../../core/config/app_constants.dart';          // ← NEW IMPORT
+import '../../../../core/config/app_constants.dart'; // ← NEW IMPORT
 
 import '../../../../core/services/avatar_sync_service.dart';
 import '../../../auth/data/supabase_auth_service.dart';
@@ -41,6 +41,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
   bool _isLoggingOut = false;
   bool _isUploadingAvatar = false;
   bool _isLoadingAcademicTerm = true;
+  late String _adminName;
+  late String _adminEmail;
+  late String _facultyName;
   String _avatarUrl = '';
   AcademicTermOption? _activeAcademicTerm;
 
@@ -53,8 +56,12 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _adminName = widget.adminName;
+    _adminEmail = widget.adminEmail;
+    _facultyName = widget.facultyName;
     _avatarUrl = widget.avatarUrl;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadAdminProfile();
       _loadAdminAvatar();
       _loadAcademicTerm();
     });
@@ -78,6 +85,30 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     } catch (_) {
       return;
     }
+  }
+
+  Future<void> _loadAdminProfile() async {
+    final email = SupabaseAuthService.currentUser?.email ?? widget.adminEmail;
+
+    Map<String, dynamic>? admin;
+    try {
+      admin =
+          (await SupabaseAdminProfileRepositoryImpl.instance
+                  .getCurrentUserProfile())
+              ?.toMap();
+    } catch (_) {
+      admin = null;
+    }
+
+    if (admin == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _adminName = (admin!['full_name'] as String? ?? widget.adminName);
+      _adminEmail = (admin['email'] as String? ?? email);
+      _facultyName = (admin['faculty'] as String? ?? widget.facultyName);
+    });
   }
 
   Future<void> _loadAcademicTerm() async {
@@ -124,7 +155,11 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
       });
     }
 
-    await Future.wait<void>([_loadAdminAvatar(), _loadAcademicTerm()]);
+    await Future.wait<void>([
+      _loadAdminProfile(),
+      _loadAdminAvatar(),
+      _loadAcademicTerm(),
+    ]);
   }
 
   // ==================== NEW: REFRESH CONTROL HELPERS ====================
@@ -160,12 +195,17 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     if (_lastRefreshTime != null) {
       final elapsed = now.difference(_lastRefreshTime!);
       if (elapsed < AppConstants.refreshCooldown) {
-        final secondsLeft = (AppConstants.refreshCooldown.inSeconds - elapsed.inSeconds)
-            .clamp(1, 60);
+        final secondsLeft =
+            (AppConstants.refreshCooldown.inSeconds - elapsed.inSeconds).clamp(
+              1,
+              60,
+            );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Please wait $secondsLeft seconds before refreshing again.'),
+              content: Text(
+                'Please wait $secondsLeft seconds before refreshing again.',
+              ),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -598,13 +638,13 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                           _buildInfoCard(
                             icon: Ionicons.people,
                             label: 'Faculty',
-                            value: widget.facultyName,
+                            value: _facultyName,
                           ),
                           const SizedBox(height: 12),
                           _buildInfoCard(
                             icon: Ionicons.mail_outline,
                             label: 'Email',
-                            value: widget.adminEmail,
+                            value: _adminEmail,
                           ),
                         ],
                       ),
@@ -758,7 +798,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  widget.adminName,
+                  _adminName,
                   style: const TextStyle(
                     color: Color(0xFF003DA5),
                     fontSize: 20,
@@ -770,7 +810,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
           ),
           const SizedBox(height: 10),
           Text(
-            widget.adminEmail,
+            _adminEmail,
             style: const TextStyle(color: Colors.black54, fontSize: 13),
           ),
           const SizedBox(height: 12),

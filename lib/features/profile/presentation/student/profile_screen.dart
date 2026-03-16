@@ -11,7 +11,7 @@ import '../../../../core/utils/global_header_search.dart';
 import '../../../../core/widgets/app_bottom_navigation_bar.dart';
 import '../../../../core/widgets/app_main_header.dart';
 import '../../../../core/config/app_router.dart';
-import '../../../../core/config/app_constants.dart';          // ← NEW IMPORT
+import '../../../../core/config/app_constants.dart'; // ← NEW IMPORT
 
 import '../../../auth/data/supabase_auth_service.dart';
 import '../../../student_management/data/academic_term_service.dart';
@@ -193,12 +193,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (_lastRefreshTime != null) {
       final elapsed = now.difference(_lastRefreshTime!);
       if (elapsed < AppConstants.refreshCooldown) {
-        final secondsLeft = (AppConstants.refreshCooldown.inSeconds - elapsed.inSeconds)
-            .clamp(1, 60);
+        final secondsLeft =
+            (AppConstants.refreshCooldown.inSeconds - elapsed.inSeconds).clamp(
+              1,
+              60,
+            );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Please wait $secondsLeft seconds before refreshing again.'),
+              content: Text(
+                'Please wait $secondsLeft seconds before refreshing again.',
+              ),
               behavior: SnackBarBehavior.floating,
             ),
           );
