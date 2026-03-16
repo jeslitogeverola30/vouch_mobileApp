@@ -12,10 +12,12 @@ import '../../features/events/presentation/admin/admin_event_details_screen.dart
 import '../../features/events/presentation/admin/admin_event_record_screen.dart';
 import '../../features/profile/presentation/admin/students_database_screen.dart';
 import '../../features/profile/presentation/student/activity_card_screen.dart';
+import '../../features/splash/splash_screen.dart';
 import '../layout/admin_main_shell.dart';
 import '../layout/student_main_shell.dart';
 
 class AppRouter {
+  static const String splash = '/';
   static const String login = '/login';
   static const String signUp = '/sign-up';
   static const String emailVerification = '/email-verification';
@@ -37,6 +39,8 @@ class AppRouter {
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
+      case splash:
+        return MaterialPageRoute(builder: (_) => const SplashScreen());
       case login:
         return MaterialPageRoute(builder: (_) => const LoginScreen());
       case signUp:
