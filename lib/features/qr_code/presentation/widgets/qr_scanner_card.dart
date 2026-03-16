@@ -347,6 +347,70 @@ class QrScannerCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+          ValueListenableBuilder<MobileScannerState>(
+            valueListenable: scannerController,
+            builder: (context, state, _) {
+              final zoom = state.zoomScale;
+              final isZoomed = zoom > 0.5;
+
+              Widget buildZoomButton({
+                required String label,
+                required bool selected,
+                required VoidCallback onTap,
+              }) {
+                return Expanded(
+                  child: OutlinedButton(
+                    onPressed: onTap,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor:
+                          selected ? Colors.white : _royalBlue,
+                      backgroundColor:
+                          selected ? _royalBlue : Colors.transparent,
+                      side: BorderSide(
+                        color: selected
+                            ? _royalBlue
+                            : _royalBlue.withOpacity(0.35),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                        color: selected ? Colors.white : _royalBlue,
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    buildZoomButton(
+                      label: '1x',
+                      selected: !isZoomed,
+                      onTap: () {
+                        scannerController.setZoomScale(0.0);
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    buildZoomButton(
+                      label: '2x',
+                      selected: isZoomed,
+                      onTap: () {
+                        scannerController.setZoomScale(1.0);
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
           Text(
             'Tip: Hold the device steady and keep good lighting for faster detection.',
             style: TextStyle(

@@ -7,11 +7,13 @@ class QrCurrentEventCard extends StatelessWidget {
   const QrCurrentEventCard({
     super.key,
     required this.event,
+    required this.isTimeInActive,
     required this.onRecordTimeIn,
     required this.onRecordTimeOut,
   });
 
   final QrEventSessionEntity event;
+  final bool isTimeInActive;
   final VoidCallback onRecordTimeIn;
   final VoidCallback onRecordTimeOut;
 
@@ -121,36 +123,65 @@ class QrCurrentEventCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: onRecordTimeIn,
-                  icon: const Icon(Ionicons.log_in, size: 17),
-                  label: const Text('Time In'),
-                  style: ElevatedButton.styleFrom(
-                    elevation: 0,
-                    backgroundColor: const Color(0xFF003DA5),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
+                child: isTimeInActive
+                    ? ElevatedButton.icon(
+                        onPressed: onRecordTimeIn,
+                        icon: const Icon(Ionicons.log_in, size: 17),
+                        label: const Text('Time In'),
+                        style: ElevatedButton.styleFrom(
+                          elevation: 0,
+                          backgroundColor: const Color(0xFF003DA5),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      )
+                    : OutlinedButton.icon(
+                        onPressed: onRecordTimeIn,
+                        icon: const Icon(Ionicons.log_in, size: 17),
+                        label: const Text('Time In'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF003DA5),
+                          side: BorderSide(
+                            color: const Color(0xFF003DA5).withOpacity(0.35),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onRecordTimeOut,
-                  icon: const Icon(Ionicons.log_out, size: 17),
-                  label: const Text('Time Out'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF003DA5),
-                    side: BorderSide(
-                      color: const Color(0xFF003DA5).withOpacity(0.35),
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
+                child: isTimeInActive
+                    ? OutlinedButton.icon(
+                        onPressed: onRecordTimeOut,
+                        icon: const Icon(Ionicons.log_out, size: 17),
+                        label: const Text('Time Out'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF003DA5),
+                          side: BorderSide(
+                            color: const Color(0xFF003DA5).withOpacity(0.35),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      )
+                    : ElevatedButton.icon(
+                        onPressed: onRecordTimeOut,
+                        icon: const Icon(Ionicons.log_out, size: 17),
+                        label: const Text('Time Out'),
+                        style: ElevatedButton.styleFrom(
+                          elevation: 0,
+                          backgroundColor: const Color(0xFF003DA5),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
               ),
             ],
           ),

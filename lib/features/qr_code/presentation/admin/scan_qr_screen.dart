@@ -461,6 +461,7 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: QrCurrentEventCard(
                         event: _currentEvent,
+                        isTimeInActive: _scanMode == _ScanMode.timeIn,
                         onRecordTimeIn: _recordTimeIn,
                         onRecordTimeOut: _recordTimeOut,
                       ),
