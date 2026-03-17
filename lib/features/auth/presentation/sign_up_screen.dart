@@ -261,6 +261,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   ],
                                 ),
                               ),
+                              const SizedBox(height: 20),
+                              Center(
+                                child: Text(
+                                  '© ${DateTime.now().year} Jeslito G. Geverola',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade400,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),

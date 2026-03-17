@@ -5,10 +5,10 @@ class FacultyCatalog {
     // 'Faculty of Nursing and Allied Health Sciences (FNAHS)',
     // 'Faculty of Agriculture and Life Sciences (FALS)',
     // 'Faculty of Business and Management (FBM)',
-    'Faculty of Computing, Engineering and Technology (FaCET)',
+    // 'Faculty of Computing, Engineering and Technology (FaCET)',
     // 'Faculty of Teacher Education (FTED)',
     // 'Faculty of Humanities, Social Sciences, and Communication (FHuSoCom)',
-    // 'Faculty of Criminal Justice Education (FCJE)',
+    'Faculty of Criminal Justice Education (FCJE)',
   ];
 
   static const Map<String, List<String>> programsByFaculty = {
@@ -23,7 +23,6 @@ class FacultyCatalog {
     ],
     'Faculty of Business and Management (FBM)': [
       'Bachelor of Science in Business Administration',
-      'Bachelor of Science in Criminology',
       'Bachelor of Science in Hospitality Management',
     ],
     'Faculty of Computing, Engineering and Technology (FaCET)': [
