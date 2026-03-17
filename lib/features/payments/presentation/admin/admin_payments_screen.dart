@@ -774,18 +774,17 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
       _currentDay = today;
     }
 
-    // === 1. Check cooldown (1 minute) ===
+    
     if (_lastRefreshTime != null) {
-      final timeSinceLast = now.difference(_lastRefreshTime!);
-      if (timeSinceLast < AppConstants.refreshCooldown) {
+      final elapsed = now.difference(_lastRefreshTime!);
+      if (elapsed < AppConstants.refreshCooldown) {
+        final secondsLeft = (AppConstants.refreshCooldown.inSeconds - elapsed.inSeconds)
+            .clamp(1, 60);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                'Please wait at least ${AppConstants.refreshCooldown.inMinutes} minute${AppConstants.refreshCooldown.inMinutes > 1 ? 's' : ''} before refreshing again.',
-              ),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 3),
+              content: Text('Please wait $secondsLeft seconds before refreshing again.'),
+              behavior: SnackBarBehavior.floating,
             ),
           );
         }

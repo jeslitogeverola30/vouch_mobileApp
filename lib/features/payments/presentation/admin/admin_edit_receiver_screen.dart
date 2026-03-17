@@ -34,7 +34,7 @@ class _EditReceiverDetailsScreenState extends State<EditReceiverDetailsScreen> {
   static const Color _titleText = Color(0xFF1F2937);
 
   static const String _defaultAccountName = 'Juan Dela Cruz';
-  static const String _defaultPosition = 'USC Treasurer';
+  static const String _defaultPosition = 'Vouch Treasurer';
   static const String _defaultGcashNumber = '09123456789';
 
   @override

@@ -253,7 +253,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                   const SizedBox(height: 20),
                                   Text(
-                                    '© ${DateTime.now().year} Jeslito G. Geverola',
+                                    '© ${DateTime.now().year} Vouch. All rights reserved.',
                                     style: GoogleFonts.poppins(
                                       fontSize: 11,
                                       color: Colors.grey.shade400,

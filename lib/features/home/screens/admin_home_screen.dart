@@ -59,18 +59,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       _currentDay = today;
     }
 
-    // === 1. Check cooldown ===
+  
     if (_lastRefreshTime != null) {
-      final timeSinceLast = now.difference(_lastRefreshTime!);
-      if (timeSinceLast < AppConstants.refreshCooldown) {
+      final elapsed = now.difference(_lastRefreshTime!);
+      if (elapsed < AppConstants.refreshCooldown) {
+        final secondsLeft = (AppConstants.refreshCooldown.inSeconds - elapsed.inSeconds)
+            .clamp(1, 60);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                'Please wait at least ${AppConstants.refreshCooldown.inMinutes} minute${AppConstants.refreshCooldown.inMinutes > 1 ? 's' : ''} before refreshing again.',
-              ),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 3),
+              content: Text('Please wait $secondsLeft seconds before refreshing again.'),
+              behavior: SnackBarBehavior.floating,
             ),
           );
         }
@@ -111,15 +110,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     await prefs.setInt('admin_daily_refresh_count', _dailyRefreshCount);
     await prefs.setString('admin_current_day', today);
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Refreshed successfully'),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 1),
-        ),
-      );
-    }
+    // if (mounted) {
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     const SnackBar(
+    //       content: Text('✅ Refreshed successfully'),
+    //       backgroundColor: Colors.green,
+    //       duration: const Duration(seconds: 1),
+    //     ),
+    //   );
+    // }
   }
 
   Future<void> _loadTodayEvents() async {

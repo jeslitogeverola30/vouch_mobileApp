@@ -144,6 +144,7 @@ class _EventsScreenState extends State<AdminEventsScreen>
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     final textTheme = GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme);
 
@@ -180,28 +181,33 @@ class _EventsScreenState extends State<AdminEventsScreen>
             widget.showChrome
                 ? SafeArea(child: _buildMainContent())
                 : _buildMainContent(),
+                
+            // ADDED: Positioned FAB to exactly match AdminPaymentsScreen
+            Positioned(
+              right: 20,
+              bottom: 20,
+              child: FloatingActionButton(
+                heroTag: 'admin_events_add_fab',
+                onPressed: () async {
+                  final created = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CreateEventScreen()),
+                  );
+
+                  if (created == true && mounted) {
+                    _refreshEvents(); 
+                  }
+                },
+                backgroundColor: const Color(0xFF003DA5),
+                foregroundColor: Colors.white,
+                elevation: 8,
+                highlightElevation: 10,
+                shape: const CircleBorder(),
+                child: const Icon(Ionicons.add, size: 28),
+              ),
+            ),
           ],
         ),
-        floatingActionButton: FloatingActionButton(
-          heroTag: 'admin_events_add_fab',
-          onPressed: () async {
-            final created = await Navigator.push<bool>(
-              context,
-              MaterialPageRoute(builder: (_) => const CreateEventScreen()),
-            );
-
-            if (created == true && mounted) {
-              _refreshEvents(); // automatic refresh (no limit)
-            }
-          },
-          backgroundColor: const Color(0xFF003DA5),
-          foregroundColor: Colors.white,
-          elevation: 8,
-          highlightElevation: 10,
-          shape: const CircleBorder(),
-          child: const Icon(Ionicons.add, size: 28),
-        ),
-        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         bottomNavigationBar: widget.showChrome
             ? AdminBottomNavigationBar(
                 currentIndex: _selectedNavIndex,
@@ -314,7 +320,7 @@ class _EventsScreenState extends State<AdminEventsScreen>
       onRefresh: _attemptRefresh, // ← controlled
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Column(
           children: todayEvents
               .map(
@@ -338,7 +344,7 @@ class _EventsScreenState extends State<AdminEventsScreen>
       onRefresh: _attemptRefresh, // ← controlled
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Column(
           children: upcomingEvents
               .map(
@@ -597,7 +603,7 @@ class _EventsScreenState extends State<AdminEventsScreen>
       onRefresh: _attemptRefresh, // ← controlled
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Column(
           children: pastEvents
               .map((event) => _buildPastEventCard(event))
@@ -858,7 +864,7 @@ class _EventsScreenState extends State<AdminEventsScreen>
 
           return SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             child: Column(
               children: rateEvents
                   .map((event) => _buildRateEventCard(event))
