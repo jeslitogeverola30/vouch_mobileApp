@@ -13,6 +13,7 @@ import '../../features/events/presentation/admin/admin_event_record_screen.dart'
 import '../../features/profile/presentation/admin/students_database_screen.dart';
 import '../../features/profile/presentation/student/activity_card_screen.dart';
 import '../../features/splash/splash_screen.dart';
+import '../../features/vouch_profile/vouch_profile.dart';
 import '../layout/admin_main_shell.dart';
 import '../layout/student_main_shell.dart';
 
@@ -36,6 +37,7 @@ class AppRouter {
   static const String studentsDatabase = '/students-database';
   static const String adminEventDetails = '/admin-event-details';
   static const String adminEventRecord = '/admin-event-record';
+  static const String aboutVouch = '/about-vouch';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -45,6 +47,8 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const LoginScreen());
       case signUp:
         return MaterialPageRoute(builder: (_) => const SignUpScreen());
+      case aboutVouch:
+        return MaterialPageRoute(builder: (_) => const VouchProfileScreen());
       case emailVerification:
         final email = settings.arguments is String
             ? settings.arguments! as String

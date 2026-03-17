@@ -299,7 +299,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
     if (fullName.isEmpty ||
         schoolId.isEmpty ||
         email.isEmpty ||
-        password.isEmpty) {
+        password.isEmpty ||
+        confirmPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all required fields.')),
       );

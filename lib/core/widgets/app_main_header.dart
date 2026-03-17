@@ -357,36 +357,41 @@ class _AppMainHeaderState extends State<AppMainHeader>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Image.asset(
-                'assets/logos/vouch_logo.png',
-                height: 40,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(width: 2),
-              Transform.translate(
-                offset: const Offset(-2, 0),
-                child: RichText(
-                  text: TextSpan(
-                    style: GoogleFonts.poppins(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
+          GestureDetector(
+            onTap: () {
+              Navigator.pushNamed(context, AppRouter.aboutVouch);
+            },
+            child: Row(
+              children: [
+                Image.asset(
+                  'assets/logos/vouch_logo.png',
+                  height: 40,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(width: 2),
+                Transform.translate(
+                  offset: const Offset(-2, 0),
+                  child: RichText(
+                    text: TextSpan(
+                      style: GoogleFonts.poppins(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      children: const [
+                        TextSpan(
+                          text: 'ou',
+                          style: TextStyle(color: Color(0xFF003DA5)),
+                        ),
+                        TextSpan(
+                          text: 'ch',
+                          style: TextStyle(color: Color(0xFFFFC107)),
+                        ),
+                      ],
                     ),
-                    children: const [
-                      TextSpan(
-                        text: 'ou',
-                        style: TextStyle(color: Color(0xFF003DA5)),
-                      ),
-                      TextSpan(
-                        text: 'ch',
-                        style: TextStyle(color: Color(0xFFFFC107)),
-                      ),
-                    ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           Row(
             children: [

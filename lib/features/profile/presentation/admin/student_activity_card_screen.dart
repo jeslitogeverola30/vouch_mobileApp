@@ -1843,7 +1843,7 @@ class _StudentActivityCardScreenState extends State<StudentActivityCardScreen> {
                     Stack(
                       children: [
                         Text(
-                          'ACES',
+                          'Vouch',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -1857,7 +1857,7 @@ class _StudentActivityCardScreenState extends State<StudentActivityCardScreen> {
                           ),
                         ),
                         Text(
-                          'ACES',
+                          'Vouch',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -1961,7 +1961,7 @@ class _StudentActivityCardScreenState extends State<StudentActivityCardScreen> {
               child: Stack(
                 children: [
                   Text(
-                    'ACES',
+                    'Vouch',
                     style: TextStyle(
                       fontSize: 12,
                       letterSpacing: 1.2,
@@ -1973,7 +1973,7 @@ class _StudentActivityCardScreenState extends State<StudentActivityCardScreen> {
                     ),
                   ),
                   const Text(
-                    'ACES',
+                    'Vouch',
                     style: TextStyle(
                       color: royalBlue,
                       fontSize: 12,
@@ -2029,7 +2029,7 @@ class _StudentActivityCardScreenState extends State<StudentActivityCardScreen> {
               child: Stack(
                 children: [
                   Text(
-                    'ACES',
+                    'Vouch',
                     style: TextStyle(
                       fontSize: 12,
                       letterSpacing: 1.2,
@@ -2041,7 +2041,7 @@ class _StudentActivityCardScreenState extends State<StudentActivityCardScreen> {
                     ),
                   ),
                   const Text(
-                    'ACES',
+                    'Vouch',
                     style: TextStyle(
                       color: royalBlue,
                       fontSize: 12,

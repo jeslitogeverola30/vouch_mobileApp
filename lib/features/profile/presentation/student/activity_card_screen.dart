@@ -1021,7 +1021,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
                     Stack(
                       children: [
                         Text(
-                          'ACES',
+                          'Vouch',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -1035,7 +1035,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
                           ),
                         ),
                         Text(
-                          'ACES',
+                          'Vouch',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -1139,7 +1139,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
               child: Stack(
                 children: [
                   Text(
-                    'ACES',
+                    'Vouch',
                     style: TextStyle(
                       fontSize: 12,
                       letterSpacing: 1.2,
@@ -1151,7 +1151,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
                     ),
                   ),
                   const Text(
-                    'ACES',
+                    'Vouch',
                     style: TextStyle(
                       color: royalBlue,
                       fontSize: 12,
@@ -1207,7 +1207,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
               child: Stack(
                 children: [
                   Text(
-                    'ACES',
+                    'Vouch',
                     style: TextStyle(
                       fontSize: 12,
                       letterSpacing: 1.2,
@@ -1219,7 +1219,7 @@ class _ActivityCardScreenState extends State<ActivityCardScreen> {
                     ),
                   ),
                   const Text(
-                    'ACES',
+                    'Vouch',
                     style: TextStyle(
                       color: royalBlue,
                       fontSize: 12,
