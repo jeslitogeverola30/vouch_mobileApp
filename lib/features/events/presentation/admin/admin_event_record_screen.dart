@@ -47,12 +47,9 @@ class _EventRecordScreenState extends State<EventRecordScreen> {
   static const String _allFilter = 'ALL';
   static const String _allProgramsFilter = 'All Programs';
   static const String _facetFacultyKey =
-      'Faculty of Computing, Engineering and Technology (FaCET)';
+      'Faculty of Criminal Justice Education (FCJE)';
   static const List<String> _fallbackFacetPrograms = [
-    'Bachelor of Science in Civil Engineering',
-    'Bachelor of Industrial Technology Management',
-    'Bachelor of Science in Information Technology',
-    'Bachelor of Science in Mathematics with Research Statistics',
+    'Bachelor of Science in Criminology',
   ];
 
   final TextEditingController _searchController = TextEditingController();
